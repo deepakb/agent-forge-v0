@@ -1,7 +1,7 @@
-import { LLMConfig, LLMProvider, LLMResponse } from '../../types/provider';
+import { LLMConfig, LLMResponse } from '../../types/provider';
 
-export abstract class BaseLLMProvider implements LLMProvider {
-  protected config: LLMConfig;
+export abstract class BaseLLMProvider {
+  protected config!: LLMConfig;
 
   constructor() {
     this.config = {
@@ -12,9 +12,15 @@ export abstract class BaseLLMProvider implements LLMProvider {
     };
   }
 
-  abstract initialize(config: LLMConfig): Promise<void>;
+  initialize(config: LLMConfig): void {
+    this.config = config;
+  }
+
   abstract complete(prompt: string, options?: Partial<LLMConfig>): Promise<LLMResponse>;
-  abstract stream(prompt: string, options?: Partial<LLMConfig>): AsyncGenerator<string, void, unknown>;
+  abstract stream(
+    prompt: string,
+    options?: Partial<LLMConfig>
+  ): AsyncGenerator<string, void, unknown>;
   abstract embedText(text: string): Promise<number[]>;
 
   protected mergeConfig(options?: Partial<LLMConfig>): LLMConfig {

@@ -1,13 +1,13 @@
 export interface LLMConfig {
   apiKey: string;
-  organizationId?: string;
   modelName?: string;
-  maxTokens?: number;
+  organizationId?: string;
   temperature?: number;
+  maxTokens?: number;
 }
 
 export interface LLMResponse {
-  content: string;
+  text: string;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -17,7 +17,7 @@ export interface LLMResponse {
 }
 
 export interface LLMProvider {
-  initialize(config: LLMConfig): Promise<void>;
+  initialize(config: LLMConfig): void;
   complete(prompt: string, options?: Partial<LLMConfig>): Promise<LLMResponse>;
   stream(prompt: string, options?: Partial<LLMConfig>): AsyncGenerator<string, void, unknown>;
   embedText(text: string): Promise<number[]>;

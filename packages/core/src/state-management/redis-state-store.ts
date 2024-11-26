@@ -2,14 +2,7 @@ import type { Redis as RedisClient, Pipeline } from 'ioredis';
 import Redis from 'ioredis';
 import { EventEmitter } from 'eventemitter3';
 import { Logger } from '@agent-forge/shared';
-import {
-  AgentState,
-  StateEvent,
-  StateEventEmitter,
-  StateStore,
-  Task,
-  Workflow,
-} from '../types';
+import { AgentState, StateEvent, StateEventEmitter, StateStore, Task, Workflow } from '../types';
 
 export interface RedisStateStoreConfig {
   redisUrl?: string;
@@ -97,7 +90,7 @@ export class RedisStateStore implements StateStore, StateEventEmitter {
   public async listTasks(filter?: Record<string, unknown>): Promise<string[]> {
     const pattern = this.getKey('task', '*');
     const keys = await this.client.keys(pattern);
-    
+
     if (!filter) {
       return keys.map((key: string) => key.split(':').pop()!);
     }

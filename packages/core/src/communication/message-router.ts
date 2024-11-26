@@ -1,11 +1,6 @@
 import { EventEmitter } from 'eventemitter3';
 import { Logger } from '@agent-forge/shared';
-import {
-  Message,
-  MessageHandler,
-  MessageRouter,
-  MessageType,
-} from '../types';
+import { Message, MessageHandler, MessageRouter, MessageType } from '../types';
 
 export class DefaultMessageRouter implements MessageRouter {
   private handlers: Map<MessageType, Set<MessageHandler>>;

@@ -1,4 +1,5 @@
 import { Logger } from '../logging/logger';
+
 import { AgentForgeError } from './custom-errors';
 import { formatErrorForLogging, formatErrorForClient } from './error-formatter';
 
@@ -32,7 +33,7 @@ export class ErrorHandler {
     context?: Record<string, unknown>
   ): Promise<void> {
     const formattedError = formatErrorForLogging(error);
-    
+
     // Log the error
     await Logger.error(formattedError, context);
 
@@ -47,16 +48,16 @@ export class ErrorHandler {
     context?: Record<string, unknown>
   ): Promise<T> {
     let lastError: Error | undefined;
-    
+
     for (let attempt = 1; attempt <= this.config.maxRetries; attempt++) {
       try {
         return await operation();
       } catch (error) {
         lastError = error as Error;
-        await Logger.warn(
-          `Retry attempt ${attempt}/${this.config.maxRetries} failed`,
-          { ...context, error: formatErrorForClient(lastError) }
-        );
+        await Logger.warn(`Retry attempt ${attempt}/${this.config.maxRetries} failed`, {
+          ...context,
+          error: formatErrorForClient(lastError),
+        });
 
         if (attempt < this.config.maxRetries) {
           await this.delay(this.config.retryDelay * attempt);

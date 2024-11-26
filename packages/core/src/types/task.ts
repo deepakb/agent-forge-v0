@@ -11,12 +11,7 @@ export const TaskStatusSchema = z.enum([
 
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
-export const TaskPrioritySchema = z.enum([
-  'LOW',
-  'MEDIUM',
-  'HIGH',
-  'CRITICAL',
-]);
+export const TaskPrioritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
 
 export type TaskPriority = z.infer<typeof TaskPrioritySchema>;
 

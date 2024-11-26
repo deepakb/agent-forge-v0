@@ -17,11 +17,13 @@ export const WorkflowStepSchema = z.object({
   description: z.string().optional(),
   task: TaskConfigSchema,
   dependencies: z.array(z.string()).default([]),
-  retryStrategy: z.object({
-    maxAttempts: z.number().default(3),
-    backoffMultiplier: z.number().default(1.5),
-    initialDelayMs: z.number().default(1000),
-  }).optional(),
+  retryStrategy: z
+    .object({
+      maxAttempts: z.number().default(3),
+      backoffMultiplier: z.number().default(1.5),
+      initialDelayMs: z.number().default(1000),
+    })
+    .optional(),
   timeout: z.number().optional(), // in milliseconds
   failureStrategy: z.enum(['FAIL_WORKFLOW', 'CONTINUE']).default('FAIL_WORKFLOW'),
 });
@@ -36,11 +38,13 @@ export const WorkflowConfigSchema = z.object({
   steps: z.array(WorkflowStepSchema),
   concurrency: z.number().default(1),
   timeout: z.number().optional(), // in milliseconds
-  retryStrategy: z.object({
-    maxAttempts: z.number().default(3),
-    backoffMultiplier: z.number().default(1.5),
-    initialDelayMs: z.number().default(1000),
-  }).optional(),
+  retryStrategy: z
+    .object({
+      maxAttempts: z.number().default(3),
+      backoffMultiplier: z.number().default(1.5),
+      initialDelayMs: z.number().default(1000),
+    })
+    .optional(),
 });
 
 export type WorkflowConfig = z.infer<typeof WorkflowConfigSchema>;

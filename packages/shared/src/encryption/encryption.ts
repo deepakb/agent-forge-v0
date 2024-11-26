@@ -1,4 +1,5 @@
 import CryptoJS from 'crypto-js';
+
 import { KeyManagement } from './key-management';
 
 export interface EncryptedData {

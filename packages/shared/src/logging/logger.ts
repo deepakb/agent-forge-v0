@@ -1,5 +1,5 @@
-import { LogHandler, LogHandlerConfig } from './log-handler';
 import { LogContext, formatLogEntry } from './log-formatter';
+import { LogHandler, LogHandlerConfig } from './log-handler';
 
 export class Logger {
   private static handler: LogHandler;
@@ -34,8 +34,8 @@ export class Logger {
   }
 
   public static async logAgentAction(
-    agentId: string, 
-    action: string, 
+    agentId: string,
+    action: string,
     context?: LogContext
   ): Promise<void> {
     const agentContext = { ...context, agentId };

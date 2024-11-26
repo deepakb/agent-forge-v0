@@ -1,5 +1,5 @@
-import { format } from 'winston';
 import { Format } from 'logform';
+import { format } from 'winston';
 
 const { combine, timestamp, json, printf } = format;
 
@@ -12,7 +12,7 @@ export interface LogContext {
 export const structuredFormat: Format = combine(
   timestamp(),
   json(),
-  printf((info) => {
+  printf(info => {
     const { timestamp, level, message, ...rest } = info;
     return JSON.stringify({
       timestamp,

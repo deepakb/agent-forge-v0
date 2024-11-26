@@ -142,7 +142,6 @@ export class WorkflowOrchestrator implements WorkflowExecutor {
           payload: task,
           priority: 0,
         });
-
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         Logger.error('Error executing workflow step', {
@@ -216,7 +215,7 @@ export class WorkflowOrchestrator implements WorkflowExecutor {
   private setupMessageHandlers(): void {
     this.messageBroker.subscribe({
       type: 'TASK_RESULT',
-      handler: async (message) => {
+      handler: async message => {
         const { taskId, result } = message.payload as { taskId: string; result: TaskResult };
         await this.handleTaskResult(result, taskId);
       },

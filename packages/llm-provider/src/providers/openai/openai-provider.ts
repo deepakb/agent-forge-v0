@@ -1,11 +1,12 @@
 import OpenAI from 'openai';
-import { BaseLLMProvider } from '../base/base-provider';
+
 import { LLMConfig, LLMResponse } from '../../types/provider';
+import { BaseLLMProvider } from '../base/base-provider';
 
 export class OpenAIProvider extends BaseLLMProvider {
   private client!: OpenAI;
 
-  async initialize(config: LLMConfig): Promise<void> {
+  initialize(config: LLMConfig): void {
     this.config = config;
     this.client = new OpenAI({
       apiKey: config.apiKey,
@@ -13,36 +14,57 @@ export class OpenAIProvider extends BaseLLMProvider {
     });
   }
 
-  async complete(prompt: string, options?: Partial<LLMConfig>): Promise<LLMResponse> {
-    const config = this.mergeConfig(options);
+  async chat(message: string): Promise<LLMResponse> {
     const response = await this.client.chat.completions.create({
-      model: config.modelName || 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: config.maxTokens,
-      temperature: config.temperature,
+      messages: [{ role: 'user', content: message }],
+      model: this.config.modelName || 'gpt-3.5-turbo',
+      temperature: this.config.temperature,
+      max_tokens: this.config.maxTokens,
     });
 
     return {
-      content: response.choices[0]?.message?.content || '',
-      usage: {
-        promptTokens: response.usage?.prompt_tokens || 0,
-        completionTokens: response.usage?.completion_tokens || 0,
-        totalTokens: response.usage?.total_tokens || 0,
-      },
-      metadata: {
-        model: response.model,
-        id: response.id,
-      },
+      text: response.choices[0]?.message?.content || '',
+      usage: response.usage
+        ? {
+            promptTokens: response.usage.prompt_tokens,
+            completionTokens: response.usage.completion_tokens,
+            totalTokens: response.usage.total_tokens,
+          }
+        : undefined,
     };
   }
 
-  async *stream(prompt: string, options?: Partial<LLMConfig>): AsyncGenerator<string, void, unknown> {
+  async complete(prompt: string, options?: Partial<LLMConfig>): Promise<LLMResponse> {
+    const config = this.mergeConfig(options);
+    const response = await this.client.completions.create({
+      prompt,
+      model: config.modelName || 'text-davinci-003',
+      temperature: config.temperature,
+      max_tokens: config.maxTokens,
+    });
+
+    return {
+      text: response.choices[0]?.text || '',
+      usage: response.usage
+        ? {
+            promptTokens: response.usage.prompt_tokens,
+            completionTokens: response.usage.completion_tokens,
+            totalTokens: response.usage.total_tokens,
+          }
+        : undefined,
+    };
+  }
+
+  async *stream(
+    prompt: string,
+    options?: Partial<LLMConfig>
+  ): AsyncGenerator<string, void, unknown> {
     const config = this.mergeConfig(options);
     const stream = await this.client.chat.completions.create({
-      model: config.modelName || 'gpt-3.5-turbo',
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: config.maxTokens,
+      model: config.modelName || 'gpt-3.5-turbo',
       temperature: config.temperature,
+      max_tokens: config.maxTokens,
       stream: true,
     });
 
@@ -61,5 +83,12 @@ export class OpenAIProvider extends BaseLLMProvider {
     });
 
     return response.data[0].embedding;
+  }
+
+  protected mergeConfig(options?: Partial<LLMConfig>): LLMConfig {
+    return {
+      ...this.config,
+      ...options,
+    };
   }
 }

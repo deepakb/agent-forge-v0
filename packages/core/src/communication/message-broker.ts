@@ -2,13 +2,7 @@ import Redis from 'ioredis';
 import { EventEmitter } from 'eventemitter3';
 import { v4 as uuidv4 } from 'uuid';
 import { Logger } from '@agent-forge/shared';
-import {
-  Message,
-  MessageBroker,
-  MessageHandler,
-  MessageType,
-  MessageSerializer,
-} from '../types';
+import { Message, MessageBroker, MessageHandler, MessageType, MessageSerializer } from '../types';
 import { DefaultMessageSerializer } from './message-serializer';
 
 export interface MessageBrokerConfig {
@@ -129,7 +123,7 @@ export class RedisPubSubMessageBroker implements MessageBroker {
       }
     });
 
-    this.subscriber.on('error', (error) => {
+    this.subscriber.on('error', error => {
       Logger.error('Redis subscriber error', { error });
     });
   }

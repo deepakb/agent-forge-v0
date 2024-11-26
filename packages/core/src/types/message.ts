@@ -32,13 +32,8 @@ export type Message = z.infer<typeof MessageSchema>;
 
 export const MessageHandlerSchema = z.object({
   type: MessageTypeSchema,
-  handler: z.function()
-    .args(MessageSchema)
-    .returns(z.promise(z.void())),
-  filter: z.function()
-    .args(MessageSchema)
-    .returns(z.boolean())
-    .optional(),
+  handler: z.function().args(MessageSchema).returns(z.promise(z.void())),
+  filter: z.function().args(MessageSchema).returns(z.boolean()).optional(),
 });
 
 export type MessageHandler = z.infer<typeof MessageHandlerSchema>;

@@ -30,7 +30,9 @@ export const formatErrorForLogging = (error: Error | AgentForgeError): string =>
   return JSON.stringify(metadata, null, 2);
 };
 
-export const formatErrorForClient = (error: Error | AgentForgeError): Omit<ErrorMetadata, 'stack'> => {
+export const formatErrorForClient = (
+  error: Error | AgentForgeError
+): Omit<ErrorMetadata, 'stack'> => {
   const metadata = formatError(error);
   const { stack, ...clientMetadata } = metadata;
   return clientMetadata;

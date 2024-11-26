@@ -63,7 +63,11 @@ export interface StateSynchronizer {
 }
 
 export interface StateVersioning {
-  createVersion(entityType: 'AGENT' | 'TASK' | 'WORKFLOW', entityId: string, state: unknown): Promise<string>;
+  createVersion(
+    entityType: 'AGENT' | 'TASK' | 'WORKFLOW',
+    entityId: string,
+    state: unknown
+  ): Promise<string>;
   getVersion(versionId: string): Promise<unknown>;
   listVersions(entityType: 'AGENT' | 'TASK' | 'WORKFLOW', entityId: string): Promise<string[]>;
   revertToVersion(versionId: string): Promise<void>;

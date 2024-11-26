@@ -1,6 +1,6 @@
 import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
-import path from 'path';
+
 import { structuredFormat } from './log-formatter';
 
 export interface LogHandlerConfig {
@@ -15,12 +15,7 @@ export class LogHandler {
   private static instance: LogHandler;
 
   private constructor(config: LogHandlerConfig = {}) {
-    const {
-      logDir = 'logs',
-      maxSize = '10m',
-      maxFiles = '7d',
-      level = 'info',
-    } = config;
+    const { logDir = 'logs', maxSize = '10m', maxFiles = '7d', level = 'info' } = config;
 
     const transport = new DailyRotateFile({
       dirname: logDir,
@@ -37,10 +32,7 @@ export class LogHandler {
       transports: [
         transport,
         new winston.transports.Console({
-          format: winston.format.combine(
-            winston.format.colorize(),
-            winston.format.simple()
-          ),
+          format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
         }),
       ],
     });

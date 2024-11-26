@@ -18,11 +18,7 @@ export class AgentNotFoundError extends AgentForgeError {
 
 export class TaskTimeoutError extends AgentForgeError {
   constructor(taskId: string, timeout: number, context?: Record<string, unknown>) {
-    super(
-      `Task ${taskId} timed out after ${timeout}ms`,
-      'TASK_TIMEOUT',
-      context
-    );
+    super(`Task ${taskId} timed out after ${timeout}ms`, 'TASK_TIMEOUT', context);
   }
 }
 

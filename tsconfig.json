@@ -1,25 +1,32 @@
 {
   "compilerOptions": {
     "target": "es2020",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
+    "module": "commonjs",
+    "lib": ["es2020"],
+    "declaration": true,
     "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noEmit": false,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "inlineSourceMap": true,
+    "inlineSources": true,
+    "experimentalDecorators": true,
+    "strictPropertyInitialization": true,
     "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
+    "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {
-      "@agent-forge/core/*": ["packages/core/src/*"],
-      "@agent-forge/llm-provider/*": ["packages/llm-provider/src/*"],
-      "@agent-forge/shared/*": ["packages/shared/src/*"]
+      "@agent-forge/*": ["packages/*/src"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "dist"]
 }

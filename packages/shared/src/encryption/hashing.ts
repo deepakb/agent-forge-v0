@@ -1,5 +1,6 @@
-import * as bcrypt from 'bcryptjs';
 import { createHash } from 'crypto';
+
+import * as bcrypt from 'bcryptjs';
 
 export interface HashingOptions {
   rounds?: number;
@@ -17,10 +18,7 @@ export class Hashing {
     return bcrypt.hash(password, salt);
   }
 
-  public static async verifyPassword(
-    password: string,
-    hash: string
-  ): Promise<boolean> {
+  public static async verifyPassword(password: string, hash: string): Promise<boolean> {
     return bcrypt.compare(password, hash);
   }
 
@@ -29,10 +27,7 @@ export class Hashing {
   }
 
   public static generateHMAC(data: string, key: string): string {
-    return createHash('sha256')
-      .update(key)
-      .update(data)
-      .digest('hex');
+    return createHash('sha256').update(key).update(data).digest('hex');
   }
 
   public static verifyHMAC(data: string, key: string, hmac: string): boolean {
