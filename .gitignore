@@ -10,6 +10,13 @@ build
 # Cache and logs
 .cache
 *.log
+.eslintcache
+.npm
+.pnpm-debug.log*
+
+# Test coverage
+coverage
+.nyc_output
 
 # Environment variables
 .env
@@ -28,3 +35,8 @@ build
 *.njsproj
 *.sln
 *.sw?
+
+# Temporary files
+*.tmp
+*.temp
+Thumbs.db

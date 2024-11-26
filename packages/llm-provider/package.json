@@ -7,7 +7,15 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsup --config tsup.config.ts",
-    "test": "jest"
+    "dev": "tsup --config tsup.config.ts --watch",
+    "clean": "rm -rf dist node_modules",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,md,json,yaml,yml}\""
   },
   "dependencies": {
     "@agent-forge/core": "workspace:*",
