@@ -1,106 +1,81 @@
-import { AgentConfig } from '../types';
-import { BaseWikiAgent } from './base-wiki-agent';
-import { AgentMessage, MessageType, SearchResult } from '../types';
+import { BaseAgent } from './base-agent';
+import { AgentMessage, MessageType, SearchResult, SynthesisAgentConfig, TaskResult } from '../types';
 import { OpenAIHelper } from '../utils/openai-helper';
 import { Logger } from '@agent-forge/shared';
 import { EventEmitter } from 'events';
 
-export class SynthesisAgent extends BaseWikiAgent {
+export class SynthesisAgent extends BaseAgent {
   private openai: OpenAIHelper;
   private completionEmitter: EventEmitter;
 
-  constructor(config: AgentConfig) {
-    super({
-      id: `synthesis-${Date.now()}`,
-      name: 'SynthesisAgent',
-      type: 'WIKI',
-      capabilities: ['synthesize'],
-      maxConcurrentTasks: 1,
-      retryAttempts: 3,
-      ...config,
-    });
+  constructor(config: SynthesisAgentConfig) {
+    super(config);
     this.openai = new OpenAIHelper(config);
     this.completionEmitter = new EventEmitter();
   }
 
-  protected async handleMessage(message: AgentMessage): Promise<void> {
+  public async handleMessage(message: AgentMessage): Promise<TaskResult> {
     try {
-      const startTime = await this.beforeOperation('handleMessage', {
-        messageType: message.type,
-        source: message.source,
-      });
-
-      switch (message.type) {
-        case MessageType.SEARCH_RESULTS:
-          const article = await this.synthesizeArticle(message.data as SearchResult[]);
-          await this.sendMessage({
-            type: MessageType.ARTICLE,
-            source: this.getId(),
-            target: 'OutputAgent',
-            data: article,
-          });
-          break;
-        default:
-          this.logger.warn('Received unsupported message type', {
-            messageType: message.type,
-            source: message.source,
-          });
+      if (message.type !== MessageType.SEARCH_RESULTS) {
+        throw new Error(`Invalid message type for SynthesisAgent: ${message.type}`);
       }
 
-      await this.afterOperation('handleMessage', startTime, undefined, {
-        messageType: message.type,
-        source: message.source,
-      });
-    } catch (error) {
-      await this.handleError('handleMessage', error as Error, {
-        messageType: message.type,
-        source: message.source,
-      });
-    }
-  }
-
-  private async synthesizeArticle(searchResults: SearchResult[]): Promise<{ content: string; sources: string[] }> {
-    try {
-      const startTime = await this.beforeOperation('synthesizeArticle', {
+      const searchResults = message.data as SearchResult[];
+      this.logger.info('Synthesizing article from search results', {
+        agentId: this.getId(),
         resultCount: searchResults.length,
       });
 
-      const prompt = `Generate a comprehensive Wikipedia-style article using the following sources:
+      // Prepare content for synthesis
+      const contentForSynthesis = searchResults
+        .map(result => `Title: ${result.title}\nContent: ${result.content}`)
+        .join('\n\n');
 
-${searchResults.map((result, index) => `[${index + 1}] ${result.title}
-URL: ${result.url}
-Content: ${result.content}
-`).join('\n\n')}
+      const prompt = `Using the following search results, write a comprehensive Wikipedia-style article. The article should be well-organized, factual, and objective. Include relevant sections with appropriate headings.
+
+Search Results:
+${contentForSynthesis}
 
 Requirements:
-1. Follow Wikipedia's neutral point of view (NPOV)
-2. Use proper section headers (== Section ==)
-3. Include citations using [n] format
-4. Add a References section at the end
-5. Focus on accuracy and factual information
-6. Maintain a professional and encyclopedic tone
-7. Organize content logically with clear sections
-8. Include relevant statistics and data when available
+1. Write in an encyclopedic style
+2. Use clear section headings
+3. Present information objectively
+4. Maintain a formal tone
+5. Focus on factual accuracy
+6. Include relevant technical details
+7. Organize content logically
 
-Format the article in MediaWiki markup format.`;
+Write the article now:`;
 
-      const content = await this.openai.complete(prompt);
-      const sources = searchResults.map(result => result.url);
+      const article = await this.openai.complete(prompt);
 
-      const result = { content, sources };
+      this.logger.info('Article synthesis completed', {
+        agentId: this.getId(),
+        articleLength: article.length,
+      });
+
+      const nextMessage: AgentMessage = {
+        type: MessageType.ARTICLE,
+        source: this.getId(),
+        target: 'workflow',
+        data: article,
+      };
+
+      await this.publishMessage(nextMessage);
 
       // Emit completion event
-      this.completionEmitter.emit('synthesisComplete', result);
+      this.completionEmitter.emit('synthesisComplete', { content: article, sources: searchResults.map(result => result.url) });
 
-      return await this.afterOperation('synthesizeArticle', startTime, result, {
-        resultCount: searchResults.length,
-        contentLength: content.length,
-        sourceCount: sources.length,
-      });
+      return {
+        success: true,
+        message: nextMessage,
+      };
     } catch (error) {
-      return await this.handleError('synthesizeArticle', error as Error, {
-        resultCount: searchResults.length,
-      });
+      this.logger.error('Synthesis agent failed', error instanceof Error ? error : new Error('Unknown error'));
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
     }
   }
 
@@ -114,14 +89,12 @@ Format the article in MediaWiki markup format.`;
     }
   }
 
-  public async start(): Promise<void> {
-    await super.start();
-    Logger.info('SynthesisAgent started successfully', { agentId: this.id });
+  public initialize(): void {
+    Logger.info('SynthesisAgent initialized successfully', { agentId: this.getId() });
   }
 
-  public async stop(): Promise<void> {
-    await super.stop();
+  public cleanup(): void {
     this.completionEmitter.removeAllListeners();
-    Logger.info('SynthesisAgent stopped successfully', { agentId: this.id });
+    Logger.info('SynthesisAgent cleaned up successfully', { agentId: this.getId() });
   }
 }

@@ -1,58 +1,52 @@
-import { Logger } from '@agent-forge/shared';
+import { config } from 'dotenv';
 import { WorkflowRunner } from './workflow/workflow-runner';
-import { AgentConfig } from './types';
-import dotenv from 'dotenv';
+import { LoggerService } from './utils/logger';
 
 // Load environment variables
-dotenv.config();
+config();
+
+const logger = LoggerService.getInstance();
 
 async function main() {
   try {
-    // Validate required environment variables
-    const requiredEnvVars = ['OPENAI_API_KEY', 'TAVILY_API_KEY'];
-    for (const envVar of requiredEnvVars) {
-      if (!process.env[envVar]) {
-        throw new Error(`Missing required environment variable: ${envVar}`);
-      }
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    const tavilyApiKey = process.env.TAVILY_API_KEY;
+    const topic = process.argv[2];
+
+    if (!openaiApiKey) {
+      throw new Error('OPENAI_API_KEY environment variable is required');
     }
 
-    // Create agent configuration
-    const config: AgentConfig = {
-      agentType: 'WIKI',
-      openaiApiKey: process.env.OPENAI_API_KEY!,
-      tavilyApiKey: process.env.TAVILY_API_KEY!,
-      logLevel: 'info',
-      maxRetries: 3,
-      timeout: 30000,
-    };
+    if (!tavilyApiKey) {
+      throw new Error('TAVILY_API_KEY environment variable is required');
+    }
 
-    // Initialize workflow runner
-    const workflowRunner = new WorkflowRunner(config);
+    if (!topic) {
+      throw new Error('Topic argument is required');
+    }
 
-    // Register completion callback
-    workflowRunner.onWorkflowComplete((result: any) => {
-      Logger.info('Workflow completed successfully', {
-        contentLength: result.content?.length || 0,
-        sourceCount: result.sources?.length || 0,
-      });
-      console.log('\nGenerated Article:');
-      console.log(result.content);
-      console.log('\nSources:');
-      result.sources.forEach((source: string, index: number) => {
-        console.log(`[${index + 1}] ${source}`);
-      });
-      process.exit(0);
+    logger.info('Starting Storm Wiki GPT', {
+      topic,
     });
 
-    // Start workflow with example topic
-    const topic = process.argv[2] || 'Artificial Intelligence Ethics';
-    await workflowRunner.start(topic);
+    // Initialize workflow
+    const workflow = new WorkflowRunner(
+      openaiApiKey,
+      tavilyApiKey,
+      topic,
+    );
 
+    // Handle workflow completion
+    workflow.onComplete((result) => {
+      console.log('\n=== Generated Article ===\n');
+      console.log(result);
+      console.log('\n=======================\n');
+      process.exit(0);
+    });
   } catch (error) {
-    Logger.error('Application failed', { error });
+    logger.error('Application failed to start', error instanceof Error ? error : new Error('Unknown error'));
     process.exit(1);
   }
 }
 
-// Run the application
 main();
