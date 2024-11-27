@@ -10,7 +10,7 @@ export interface EncryptedData {
 }
 
 export class Encryption {
-  private static readonly ALGORITHM = CryptoJS.mode.CBC;  // Using CBC mode as GCM is not available in CryptoJS
+  private static readonly ALGORITHM = CryptoJS.mode.CBC; // Using CBC mode as GCM is not available in CryptoJS
 
   public static encrypt(data: string, key: string): EncryptedData {
     const salt = KeyManagement.generateSalt();

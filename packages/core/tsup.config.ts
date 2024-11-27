@@ -14,5 +14,5 @@ export default defineConfig({
   target: 'es2020',
   outDir: 'dist',
   tsconfig: 'tsconfig.json',
-  onSuccess: 'tsc --emitDeclarationOnly'
+  onSuccess: 'tsc --emitDeclarationOnly',
 });
