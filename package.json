@@ -25,6 +25,7 @@
     "@commitlint/cli": "^18.4.0",
     "@commitlint/config-conventional": "^18.4.0",
     "@types/node": "^20.0.0",
+    "@types/uuid": "^9.0.8",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.0.0",
@@ -47,6 +48,7 @@
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "crypto-js": "^4.2.0",
+    "uuid": "^9.0.1",
     "winston-daily-rotate-file": "^4.7.1"
   }
 }

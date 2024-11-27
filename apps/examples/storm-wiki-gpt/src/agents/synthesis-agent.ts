@@ -1,77 +1,110 @@
+import { AgentConfig } from '../types';
+import { BaseWikiAgent } from './base-wiki-agent';
+import { AgentMessage, MessageType, SearchResult } from '../types';
+import { OpenAIHelper } from '../utils/openai-helper';
 import { Logger } from '@agent-forge/shared';
 import { EventEmitter } from 'events';
-import { BaseWikiAgent } from './base-wiki-agent';
-import { OpenAIHelper } from '../utils/openai-helper';
-import {
-  AgentMessage,
-  AgentType,
-  MessageType,
-  SearchResult,
-  SearchResultsMessageData,
-  SynthesisResult,
-} from '../types';
 
 export class SynthesisAgent extends BaseWikiAgent {
+  private openai: OpenAIHelper;
   private completionEmitter: EventEmitter;
 
-  constructor() {
-    super(AgentType.SYNTHESIS);
+  constructor(config: AgentConfig) {
+    super({
+      id: `synthesis-${Date.now()}`,
+      name: 'SynthesisAgent',
+      type: 'WIKI',
+      capabilities: ['synthesize'],
+      maxConcurrentTasks: 1,
+      retryAttempts: 3,
+      ...config,
+    });
+    this.openai = new OpenAIHelper(config);
     this.completionEmitter = new EventEmitter();
   }
 
-  public async handleMessage(message: AgentMessage): Promise<void> {
+  protected async handleMessage(message: AgentMessage): Promise<void> {
     try {
-      Logger.info('SynthesisAgent handling message', {
+      const startTime = await this.beforeOperation('handleMessage', {
         messageType: message.type,
+        source: message.source,
       });
 
-      if (message.type === MessageType.SEARCH_RESULTS) {
-        const { query, results } = message.data as SearchResultsMessageData;
-        await this.handleSearchResults(query, results);
+      switch (message.type) {
+        case MessageType.SEARCH_RESULTS:
+          const article = await this.synthesizeArticle(message.data as SearchResult[]);
+          await this.sendMessage({
+            type: MessageType.ARTICLE,
+            source: this.getId(),
+            target: 'OutputAgent',
+            data: article,
+          });
+          break;
+        default:
+          this.logger.warn('Received unsupported message type', {
+            messageType: message.type,
+            source: message.source,
+          });
       }
-    } catch (error) {
-      Logger.error('Error handling message in SynthesisAgent', {
+
+      await this.afterOperation('handleMessage', startTime, undefined, {
         messageType: message.type,
-        error,
+        source: message.source,
       });
-      throw error;
+    } catch (error) {
+      await this.handleError('handleMessage', error as Error, {
+        messageType: message.type,
+        source: message.source,
+      });
     }
   }
 
-  private async handleSearchResults(query: string, results: SearchResult[]): Promise<void> {
+  private async synthesizeArticle(searchResults: SearchResult[]): Promise<{ content: string; sources: string[] }> {
     try {
-      Logger.info('SynthesisAgent processing search results', {
-        query,
-        resultCount: results.length,
+      const startTime = await this.beforeOperation('synthesizeArticle', {
+        resultCount: searchResults.length,
       });
 
-      // Generate summary using OpenAI
-      const summary = await OpenAIHelper.generateSummary(query, results);
+      const prompt = `Generate a comprehensive Wikipedia-style article using the following sources:
 
-      // Create synthesis result
-      const synthesisResult: SynthesisResult = {
-        query,
-        summary,
-        sources: results.map((result) => result.url),
-      };
+${searchResults.map((result, index) => `[${index + 1}] ${result.title}
+URL: ${result.url}
+Content: ${result.content}
+`).join('\n\n')}
+
+Requirements:
+1. Follow Wikipedia's neutral point of view (NPOV)
+2. Use proper section headers (== Section ==)
+3. Include citations using [n] format
+4. Add a References section at the end
+5. Focus on accuracy and factual information
+6. Maintain a professional and encyclopedic tone
+7. Organize content logically with clear sections
+8. Include relevant statistics and data when available
+
+Format the article in MediaWiki markup format.`;
+
+      const content = await this.openai.complete(prompt);
+      const sources = searchResults.map(result => result.url);
+
+      const result = { content, sources };
 
       // Emit completion event
-      this.completionEmitter.emit('synthesisComplete', synthesisResult);
+      this.completionEmitter.emit('synthesisComplete', result);
 
-      Logger.info('SynthesisAgent completed synthesis', {
-        query,
-        summaryLength: summary.length,
+      return await this.afterOperation('synthesizeArticle', startTime, result, {
+        resultCount: searchResults.length,
+        contentLength: content.length,
+        sourceCount: sources.length,
       });
     } catch (error) {
-      Logger.error('Error processing search results in SynthesisAgent', {
-        query,
-        error,
+      return await this.handleError('synthesizeArticle', error as Error, {
+        resultCount: searchResults.length,
       });
-      throw error;
     }
   }
 
-  public onSynthesisComplete(callback: (result: SynthesisResult) => void): void {
+  public onSynthesisComplete(callback: (result: { content: string; sources: string[] }) => void): void {
     try {
       this.completionEmitter.on('synthesisComplete', callback);
       Logger.info('SynthesisAgent registered completion callback');

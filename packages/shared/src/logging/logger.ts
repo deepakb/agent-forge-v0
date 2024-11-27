@@ -1,62 +1,146 @@
-import { LogContext, formatLogEntry } from './log-formatter';
-import { LogHandler, LogHandlerConfig } from './log-handler';
+import { LogHandler } from './log-handler';
+import { formatLogEntry, StructuredLogEntry } from './log-formatter';
+import { formatError } from '../errors/error-formatter';
+
+export interface LoggerConfig {
+  component?: string;
+  workflowId?: string;
+  agentId?: string;
+  agentType?: string;
+}
 
 export class Logger {
   private static handler: LogHandler;
+  private static defaultConfig: LoggerConfig = {};
 
-  public static initialize(config?: LogHandlerConfig): void {
-    this.handler = LogHandler.getInstance(config);
+  public static initialize(config?: LoggerConfig): void {
+    this.defaultConfig = config || {};
+    this.handler = LogHandler.getInstance();
   }
 
-  public static async info(message: string, context?: LogContext): Promise<void> {
-    const metadata = formatLogEntry('info', message, context);
-    await this.handler.writeLog('info', message, metadata as Record<string, unknown>);
+  public static setDefaultConfig(config: Partial<LoggerConfig>): void {
+    this.defaultConfig = { ...this.defaultConfig, ...config };
   }
 
-  public static async debug(message: string, context?: LogContext): Promise<void> {
-    const metadata = formatLogEntry('debug', message, context);
-    await this.handler.writeLog('debug', message, metadata as Record<string, unknown>);
+  private static createContext(
+    context?: Partial<StructuredLogEntry>
+  ): Partial<StructuredLogEntry> {
+    return {
+      ...this.defaultConfig,
+      ...context,
+    };
   }
 
-  public static async warn(message: string, context?: LogContext): Promise<void> {
-    const metadata = formatLogEntry('warn', message, context);
-    await this.handler.writeLog('warn', message, metadata as Record<string, unknown>);
+  public static async logWorkflowStart(
+    workflowId: string,
+    context?: Partial<StructuredLogEntry>
+  ): Promise<void> {
+    const metadata = formatLogEntry('info', 'Workflow started', {
+      ...this.createContext(context),
+      workflowId,
+      operation: 'workflowInit',
+      status: 'in_progress',
+      startTime: new Date(),
+    });
+    await this.handler.writeLog('info', metadata.message, metadata);
   }
 
-  public static async error(message: string, context?: LogContext): Promise<void> {
-    const metadata = formatLogEntry('error', message, context);
-    await this.handler.writeLog('error', message, metadata as Record<string, unknown>);
-  }
-
-  public static async fatal(message: string, context?: LogContext): Promise<void> {
-    const metadata = formatLogEntry('fatal', message, context);
-    await this.handler.writeLog('fatal', message, metadata as Record<string, unknown>);
+  public static async logWorkflowEnd(
+    workflowId: string,
+    success: boolean,
+    context?: Partial<StructuredLogEntry>
+  ): Promise<void> {
+    const metadata = formatLogEntry('info', 'Workflow completed', {
+      ...this.createContext(context),
+      workflowId,
+      operation: 'workflowCompletion',
+      status: success ? 'success' : 'failure',
+    });
+    await this.handler.writeLog('info', metadata.message, metadata);
   }
 
   public static async logAgentAction(
     agentId: string,
     action: string,
-    context?: LogContext
+    context?: Partial<StructuredLogEntry>
   ): Promise<void> {
-    const agentContext = { ...context, agentId };
-    await this.info(`Agent ${agentId}: ${action}`, agentContext);
-  }
-
-  public static async logTaskProgress(
-    taskId: string,
-    status: string,
-    context?: LogContext
-  ): Promise<void> {
-    const taskContext = { ...context, taskId };
-    await this.info(`Task ${taskId}: ${status}`, taskContext);
+    const metadata = formatLogEntry('info', `Agent ${agentId}: ${action}`, {
+      ...this.createContext(context),
+      agentId,
+      operation: action,
+      status: 'in_progress',
+    });
+    await this.handler.writeLog('info', metadata.message, metadata);
   }
 
   public static async logAgentError(
     agentId: string,
     error: Error,
-    context?: LogContext
+    context?: Partial<StructuredLogEntry>
   ): Promise<void> {
-    const errorContext = { ...context, agentId, error: error.stack };
-    await this.error(`Agent ${agentId} error: ${error.message}`, errorContext);
+    const errorData = formatError(error);
+    const metadata = formatLogEntry('error', `Agent ${agentId} error: ${error.message}`, {
+      ...this.createContext(context),
+      agentId,
+      operation: 'error',
+      status: 'failure',
+      error: errorData,
+    });
+    await this.handler.writeLog('error', metadata.message, metadata);
+  }
+
+  public static async info(
+    message: string,
+    context?: Partial<StructuredLogEntry>
+  ): Promise<void> {
+    const metadata = formatLogEntry('info', message, {
+      ...this.createContext(context),
+      status: context?.status || 'success',
+    });
+    await this.handler.writeLog('info', metadata.message, metadata);
+  }
+
+  public static async debug(
+    message: string,
+    context?: Partial<StructuredLogEntry>
+  ): Promise<void> {
+    const metadata = formatLogEntry('debug', message, {
+      ...this.createContext(context),
+      status: context?.status || 'success',
+    });
+    await this.handler.writeLog('debug', metadata.message, metadata);
+  }
+
+  public static async warn(
+    message: string,
+    context?: Partial<StructuredLogEntry>
+  ): Promise<void> {
+    const metadata = formatLogEntry('warn', message, {
+      ...this.createContext(context),
+      status: 'warning',
+    });
+    await this.handler.writeLog('warn', metadata.message, metadata);
+  }
+
+  public static async error(
+    message: string,
+    context?: Partial<StructuredLogEntry>
+  ): Promise<void> {
+    const metadata = formatLogEntry('error', message, {
+      ...this.createContext(context),
+      status: 'failure',
+    });
+    await this.handler.writeLog('error', metadata.message, metadata);
+  }
+
+  public static async fatal(
+    message: string,
+    context?: Partial<StructuredLogEntry>
+  ): Promise<void> {
+    const metadata = formatLogEntry('fatal', message, {
+      ...this.createContext(context),
+      status: 'failure',
+    });
+    await this.handler.writeLog('fatal', metadata.message, metadata);
   }
 }

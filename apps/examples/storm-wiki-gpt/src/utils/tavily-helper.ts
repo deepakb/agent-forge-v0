@@ -1,92 +1,62 @@
-import axios from 'axios';
-import { SearchResult, TavilySearchOptions } from '../types';
-import { LoggerService, LogContext } from './logger';
-import { config } from 'dotenv';
-import path from 'path';
-
-// Load environment variables
-config({ path: path.resolve(__dirname, '../../.env') });
+import { AgentConfig } from '../types';
+import { LoggerService } from './logger';
+import { SearchResult } from '../types';
 
 export class TavilyHelper {
-  private static readonly API_KEY = process.env.TAVILY_API_KEY;
-  private static readonly API_URL = 'https://api.tavily.com/search';
-  private static readonly logger = LoggerService.getInstance();
+  private apiKey: string;
+  private logger: LoggerService;
 
-  public static async search(
-    query: string,
-    options: TavilySearchOptions = {}
-  ): Promise<SearchResult[]> {
-    const startTime = Date.now();
-    const context: LogContext = {
-      component: 'TavilyHelper',
-      operation: 'search',
-    };
+  constructor(config: AgentConfig) {
+    if (!config.tavilyApiKey) {
+      throw new Error('Tavily API key is required');
+    }
+    this.apiKey = config.tavilyApiKey;
+    this.logger = LoggerService.getInstance();
+  }
 
+  public async search(query: string): Promise<SearchResult[]> {
     try {
-      this.logger.info('Initiating search request', {
-        ...context,
+      const startTime = this.logger.startOperation('tavily_search', {
         query,
       });
 
-      if (!this.API_KEY) {
-        throw new Error('TAVILY_API_KEY environment variable is not set');
-      }
-
-      const response = await axios.post(
-        this.API_URL,
-        {
-          query,
-          max_results: options.maxResults || 3,
-          search_depth: options.searchDepth || 'advanced',
-          include_urls: options.includeUrls,
-          exclude_urls: options.excludeUrls,
-          include_domains: options.includeDomainsOnly,
-          exclude_domains: options.excludeDomainsOnly,
-          api_key: this.API_KEY,
+      const response = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
         },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const results = response.data.results || [];
-      const duration = Date.now() - startTime;
-
-      this.logger.trace('search', {
-        ...context,
-        status: 'success',
-        resultCount: results.length,
-        duration,
+        body: JSON.stringify({
+          query,
+          search_depth: 'advanced',
+          include_answer: false,
+          include_domains: ['wikipedia.org', 'britannica.com', 'sciencedirect.com'],
+          exclude_domains: ['pinterest.com', 'facebook.com', 'twitter.com'],
+        }),
       });
 
-      return results.map((result: any) => ({
-        title: result.title || '',
-        url: result.url || '',
-        content: result.content || '',
-        score: result.score || 0,
-      }));
-    } catch (error) {
-      const duration = Date.now() - startTime;
-
-      if (axios.isAxiosError(error)) {
-        this.logger.error('Search request failed', {
-          ...context,
-          error: {
-            message: error.message,
-            response: error.response?.data,
-            status: error.response?.status,
-          },
-          duration,
-        });
-      } else {
-        this.logger.error('Search operation failed', {
-          ...context,
-          error,
-          duration,
-        });
+      if (!response.ok) {
+        throw new Error(`Tavily API error: ${response.statusText}`);
       }
+
+      const data = await response.json();
+      const results: SearchResult[] = data.results.map((result: any) => ({
+        url: result.url,
+        title: result.title,
+        content: result.content,
+        score: result.relevance_score || 0,
+      }));
+
+      this.logger.endOperation('tavily_search', startTime, {
+        query,
+        resultCount: results.length,
+      });
+
+      return results;
+    } catch (error) {
+      this.logger.error('Tavily search failed', error as Error, {
+        query,
+      });
       throw error;
     }
   }

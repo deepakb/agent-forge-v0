@@ -1,105 +1,115 @@
-import { Logger } from '@agent-forge/shared';
 import { BaseWikiAgent } from './base-wiki-agent';
+import { AgentMessage, MessageType, SearchResult, Task, TaskConfig, TaskMetadata, AgentConfig, Query } from '../types';
 import { TavilyHelper } from '../utils/tavily-helper';
-import {
-  AgentMessage,
-  AgentType,
-  MessageType,
-  Query,
-  QueryMessageData,
-  SearchResult,
-  SearchResultsMessageData,
-  TavilySearchOptions,
-} from '../types';
 
 export class FetchAgent extends BaseWikiAgent {
-  constructor() {
-    super(AgentType.FETCH);
+  private tavily: TavilyHelper;
+
+  constructor(config: AgentConfig) {
+    super({
+      ...config,
+      agentType: 'FetchAgent',
+    });
+    this.tavily = new TavilyHelper(config);
   }
 
-  public async handleMessage(message: AgentMessage): Promise<void> {
+  protected async handleMessage(message: AgentMessage): Promise<void> {
     try {
-      Logger.info('FetchAgent handling message', {
+      const startTime = await this.beforeOperation('handleMessage', {
         messageType: message.type,
+        source: message.source,
       });
 
-      if (message.type === MessageType.QUERY) {
-        const queryData = message.data as QueryMessageData;
-        await this.handleQueryMessage(queryData);
+      const task = message.data as Task;
+
+      switch (message.type) {
+        case MessageType.SEARCH_QUERIES:
+          const searchQueries = task.result?.data as string[];
+          const searchResults = await this.fetchContent(searchQueries);
+          
+          const nextTaskConfig: TaskConfig = {
+            id: `synthesis-${Date.now()}`,
+            type: MessageType.SEARCH_RESULTS,
+            priority: task.config.priority,
+            retryAttempts: task.config.retryAttempts,
+            dependencies: [task.config.id],
+            requiredCapabilities: ['synthesis']
+          };
+
+          const nextTaskMetadata: TaskMetadata = {
+            status: 'PENDING',
+            createdAt: new Date(),
+            attempts: 0,
+            progress: 0
+          };
+
+          const nextTask: Task = {
+            config: nextTaskConfig,
+            metadata: nextTaskMetadata,
+            result: {
+              success: true,
+              data: searchResults
+            }
+          };
+
+          await this.sendMessage({
+            type: MessageType.SEARCH_RESULTS,
+            source: this.getId(),
+            target: 'SynthesisAgent',
+            data: nextTask
+          });
+          break;
+        default:
+          this.logger.warn('Received unsupported message type', {
+            messageType: message.type,
+            source: message.source,
+          });
       }
-    } catch (error) {
-      Logger.error('Error handling message in FetchAgent', {
+
+      await this.afterOperation('handleMessage', startTime, undefined, {
         messageType: message.type,
-        error,
-      });
-      throw error;
-    }
-  }
-
-  private async handleQueryMessage(query: Query): Promise<void> {
-    try {
-      Logger.info('FetchAgent processing query', { query });
-
-      // Prepare search options
-      const searchOptions: TavilySearchOptions = {
-        maxResults: query.maxResults,
-        searchDepth: 'advanced',
-      };
-
-      // Perform search using TavilyHelper
-      const searchResults = await TavilyHelper.search(query.query, searchOptions);
-
-      // Format the results
-      const formattedResults = this.formatSearchResults(searchResults);
-
-      // Create search results message data
-      const searchResultsData: SearchResultsMessageData = {
-        query: query.query,
-        results: formattedResults,
-      };
-
-      // Send results to synthesis agent
-      await this.sendMessage({
-        type: MessageType.SEARCH_RESULTS,
-        data: searchResultsData,
-        source: AgentType.FETCH,
-        target: AgentType.SYNTHESIS,
-      });
-
-      Logger.info('FetchAgent sent search results', {
-        query: query.query,
-        resultCount: formattedResults.length,
+        source: message.source,
       });
     } catch (error) {
-      Logger.error('Error processing query in FetchAgent', {
-        query,
-        error,
+      await this.handleError('handleMessage', error as Error, {
+        messageType: message.type,
+        source: message.source,
       });
-      throw error;
     }
   }
 
-  private formatSearchResults(results: any[]): SearchResult[] {
+  private async fetchContent(queries: string[]): Promise<SearchResult[]> {
     try {
-      return results.map((result) => ({
-        title: result.title || '',
-        url: result.url || '',
-        content: result.content || '',
-        score: result.score || 0,
-      }));
+      const startTime = await this.beforeOperation('fetchContent', {
+        queryCount: queries.length,
+      });
+
+      const searchPromises = queries.map(async (query) => {
+        const queryStartTime = await this.beforeOperation('searchQuery', { query });
+        const results = await this.tavily.search(query);
+        await this.afterOperation('searchQuery', queryStartTime, results, {
+          query,
+          resultCount: results.length,
+        });
+        return results;
+      });
+
+      const allResults = await Promise.all(searchPromises);
+      const flattenedResults = allResults.flat();
+
+      // Deduplicate results by URL
+      const uniqueResults = Array.from(
+        new Map(flattenedResults.map(item => [item.url, item])).values()
+      );
+
+      return await this.afterOperation('fetchContent', startTime, uniqueResults, {
+        queryCount: queries.length,
+        resultCount: uniqueResults.length,
+      });
     } catch (error) {
-      Logger.error('Error formatting search results', { error });
-      throw error;
+      return await this.handleError('fetchContent', error as Error, {
+        queryCount: queries.length,
+      });
     }
-  }
-
-  public async start(): Promise<void> {
-    await super.start();
-    Logger.info('FetchAgent started successfully', { agentId: this.id });
-  }
-
-  public async stop(): Promise<void> {
-    await super.stop();
-    Logger.info('FetchAgent stopped successfully', { agentId: this.id });
   }
 }

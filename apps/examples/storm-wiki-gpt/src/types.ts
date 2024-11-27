@@ -1,74 +1,61 @@
 import { z } from 'zod';
-import { Task as BaseTask } from '@agent-forge/core';
-
-export interface Task extends BaseTask {
-  id: string;
-  type: string;
-  data: unknown;
-}
-
-export enum AgentType {
-  QUERY = 'QUERY',
-  FETCH = 'FETCH',
-  SYNTHESIS = 'SYNTHESIS',
-}
+import { Task, TaskResult, TaskConfig, TaskMetadata } from '@agent-forge/core';
 
 export enum MessageType {
+  TOPIC = 'TOPIC',
   QUERY = 'QUERY',
+  SEARCH_QUERIES = 'SEARCH_QUERIES',
   SEARCH_RESULTS = 'SEARCH_RESULTS',
-  SYNTHESIS_COMPLETE = 'SYNTHESIS_COMPLETE',
+  ARTICLE = 'ARTICLE',
 }
 
-export const QuerySchema = z.object({
-  query: z.string(),
-  maxResults: z.number().optional(),
-});
-
-export type Query = z.infer<typeof QuerySchema>;
-
+// Zod Schemas for Runtime Type Validation
 export const SearchResultSchema = z.object({
+  url: z.string().url(),
   title: z.string(),
-  url: z.string(),
   content: z.string(),
   score: z.number(),
 });
 
-export type SearchResult = z.infer<typeof SearchResultSchema>;
+export const QuerySchema = z.object({
+  query: z.string(),
+  maxResults: z.number().optional(),
+  minScore: z.number().optional(),
+});
 
 export const SynthesisResultSchema = z.object({
-  query: z.string(),
-  summary: z.string(),
+  content: z.string(),
   sources: z.array(z.string()),
 });
 
-export type SynthesisResult = z.infer<typeof SynthesisResultSchema>;
-
-export interface TavilySearchOptions {
-  maxResults?: number;
-  searchDepth?: 'basic' | 'advanced';
-  includeUrls?: string[];
-  excludeUrls?: string[];
-  includeDomainsOnly?: string[];
-  excludeDomainsOnly?: string[];
-}
-
-export interface QueryMessageData {
-  query: string;
-  maxResults?: number;
-}
-
-export interface SearchResultsMessageData {
-  query: string;
-  results: SearchResult[];
-}
-
-export interface SynthesisCompleteMessageData extends SynthesisResult {}
-
-export const AgentMessageSchema = z.object({
-  type: z.enum([MessageType.QUERY, MessageType.SEARCH_RESULTS, MessageType.SYNTHESIS_COMPLETE]),
-  data: z.union([QuerySchema, SearchResultSchema, SynthesisResultSchema]),
-  source: z.enum([AgentType.QUERY, AgentType.FETCH, AgentType.SYNTHESIS]),
-  target: z.enum([AgentType.QUERY, AgentType.FETCH, AgentType.SYNTHESIS]).optional(),
+export const AgentConfigSchema = z.object({
+  agentType: z.string(),
+  id: z.string().optional(),
+  name: z.string().optional(),
+  type: z.string().optional(),
+  capabilities: z.array(z.string()).optional(),
+  maxConcurrentTasks: z.number().optional(),
+  retryAttempts: z.number().optional(),
+  openaiApiKey: z.string().optional(),
+  tavilyApiKey: z.string().optional(),
+  logLevel: z.string().optional(),
+  maxRetries: z.number().optional(),
+  timeout: z.number().optional(),
 });
 
+export const AgentMessageSchema = z.object({
+  type: z.nativeEnum(MessageType),
+  source: z.string(),
+  target: z.string(),
+  data: z.unknown(),
+});
+
+// Type definitions from schemas
+export type SearchResult = z.infer<typeof SearchResultSchema>;
+export type Query = z.infer<typeof QuerySchema>;
+export type SynthesisResult = z.infer<typeof SynthesisResultSchema>;
+export type AgentConfig = z.infer<typeof AgentConfigSchema>;
 export type AgentMessage = z.infer<typeof AgentMessageSchema>;
+
+// Re-export core types
+export { Task, TaskResult, TaskConfig, TaskMetadata };
