@@ -216,6 +216,7 @@ export class WorkflowOrchestrator implements WorkflowExecutor {
     });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private initializeWorkflowMetadata(_config: WorkflowConfig): WorkflowMetadata {
     return {
       status: 'PENDING',

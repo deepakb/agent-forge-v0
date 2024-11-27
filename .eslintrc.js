@@ -70,5 +70,5 @@ module.exports = {
       }
     }
   ],
-  ignorePatterns: ['dist/', 'node_modules/', 'coverage/']
+  ignorePatterns: ['dist/', 'node_modules/', 'coverage/', '**/tsup.config.ts']
 };
