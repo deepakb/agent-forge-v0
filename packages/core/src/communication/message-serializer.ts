@@ -18,14 +18,14 @@ export class DefaultMessageSerializer implements MessageSerializer {
     }
   }
 
-  private replacer(key: string, value: any): any {
+  private replacer(_key: string, value: any): any {
     if (value instanceof Date) {
       return { __type: 'Date', value: value.toISOString() };
     }
     return value;
   }
 
-  private reviver(key: string, value: any): any {
+  private reviver(_key: string, value: any): any {
     if (value && value.__type === 'Date') {
       return new Date(value.value);
     }

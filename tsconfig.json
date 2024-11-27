@@ -2,31 +2,28 @@
   "compilerOptions": {
     "target": "es2020",
     "module": "commonjs",
-    "lib": ["es2020"],
+    "moduleResolution": "node",
     "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
     "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "noImplicitThis": true,
-    "alwaysStrict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "inlineSourceMap": true,
-    "inlineSources": true,
-    "experimentalDecorators": true,
-    "strictPropertyInitialization": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node",
     "baseUrl": ".",
     "paths": {
-      "@agent-forge/*": ["packages/*/src"]
+      "@agent-forge/shared": ["packages/shared/src"],
+      "@agent-forge/core": ["packages/core/src"],
+      "@agent-forge/llm-provider": ["packages/llm-provider/src"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules", "dist"]
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/core" },
+    { "path": "packages/llm-provider" }
+  ],
+  "files": [],
+  "exclude": ["**/node_modules", "**/dist"]
 }

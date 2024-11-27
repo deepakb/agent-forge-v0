@@ -1,7 +1,6 @@
-import type { Redis as RedisClient, Pipeline } from 'ioredis';
+import type { Redis as RedisClient } from 'ioredis';
 import Redis from 'ioredis';
 import { EventEmitter } from 'eventemitter3';
-import { Logger } from '@agent-forge/shared';
 import { AgentState, StateEvent, StateEventEmitter, StateStore, Task, Workflow } from '../types';
 
 export interface RedisStateStoreConfig {

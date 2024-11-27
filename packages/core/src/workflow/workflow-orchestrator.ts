@@ -1,8 +1,6 @@
-import { EventEmitter } from 'eventemitter3';
 import { v4 as uuidv4 } from 'uuid';
 import { Logger } from '@agent-forge/shared';
 import {
-  Message,
   MessageBroker,
   StateStore,
   Task,
@@ -27,8 +25,6 @@ export class WorkflowOrchestrator implements WorkflowExecutor {
   private readonly messageBroker: MessageBroker;
   private readonly stateStore: StateStore;
   private readonly maxRetries: number;
-  private readonly retryDelayMs: number;
-  private readonly events: EventEmitter;
   private readonly activeWorkflows: Map<string, Workflow>;
   private readonly pendingSteps: Map<string, Set<string>>;
 
@@ -36,8 +32,6 @@ export class WorkflowOrchestrator implements WorkflowExecutor {
     this.messageBroker = config.messageBroker;
     this.stateStore = config.stateStore;
     this.maxRetries = config.maxRetries || 3;
-    this.retryDelayMs = config.retryDelayMs || 1000;
-    this.events = new EventEmitter();
     this.activeWorkflows = new Map();
     this.pendingSteps = new Map();
 
@@ -222,7 +216,7 @@ export class WorkflowOrchestrator implements WorkflowExecutor {
     });
   }
 
-  private initializeWorkflowMetadata(config: WorkflowConfig): WorkflowMetadata {
+  private initializeWorkflowMetadata(_config: WorkflowConfig): WorkflowMetadata {
     return {
       status: 'PENDING',
       startTime: new Date(),

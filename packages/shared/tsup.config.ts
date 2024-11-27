@@ -2,12 +2,17 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: ['src/index.ts'],
-  clean: true,
-  dts: true,
   format: ['cjs', 'esm'],
-  minify: false,
+  dts: false,
   sourcemap: true,
+  clean: false,
   treeshake: true,
-  tsconfig: './tsconfig.json',
+  splitting: false,
+  minify: false,
+  bundle: true,
+  skipNodeModulesBundle: true,
+  target: 'es2020',
   outDir: 'dist',
+  tsconfig: 'tsconfig.json',
+  onSuccess: 'tsc --emitDeclarationOnly'
 });

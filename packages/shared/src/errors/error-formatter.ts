@@ -34,6 +34,7 @@ export const formatErrorForClient = (
   error: Error | AgentForgeError
 ): Omit<ErrorMetadata, 'stack'> => {
   const metadata = formatError(error);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { stack, ...clientMetadata } = metadata;
   return clientMetadata;
 };

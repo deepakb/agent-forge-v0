@@ -6,7 +6,6 @@ import {
   AgentMetadata,
   AgentState,
   AgentStatus,
-  Message,
   MessageHandler,
   Task,
   TaskResult,

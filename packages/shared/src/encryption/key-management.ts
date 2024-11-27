@@ -9,7 +9,6 @@ export interface KeyPair {
 
 export class KeyManagement {
   private static readonly KEY_SIZE = 32; // 256 bits
-  private static currentKey: string;
 
   public static generateSymmetricKey(): string {
     return randomBytes(this.KEY_SIZE).toString('hex');
@@ -25,9 +24,10 @@ export class KeyManagement {
     };
   }
 
-  public static rotateKey(newKey: string, _oldKey: string): void {
-    // Prefix with underscore to indicate intentionally unused parameter
-    this.currentKey = newKey;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  public static rotateKey(_newKey: string, _oldKey: string): void {
+    // Method stub for future implementation
+    // TODO: Implement key rotation logic
   }
 
   public static deriveKey(password: string, salt: string): string {

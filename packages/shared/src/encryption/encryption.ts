@@ -10,17 +10,17 @@ export interface EncryptedData {
 }
 
 export class Encryption {
-  private static readonly ALGORITHM = 'AES-GCM';
+  private static readonly ALGORITHM = CryptoJS.mode.CBC;  // Using CBC mode as GCM is not available in CryptoJS
 
   public static encrypt(data: string, key: string): EncryptedData {
     const salt = KeyManagement.generateSalt();
     const iv = KeyManagement.generateNonce();
     const derivedKey = KeyManagement.deriveKey(key, salt);
 
-    // Encrypt the data
+    // Encrypt the data using configured algorithm
     const encrypted = CryptoJS.AES.encrypt(data, derivedKey, {
       iv: CryptoJS.enc.Hex.parse(iv),
-      mode: CryptoJS.mode as any,
+      mode: this.ALGORITHM,
       padding: CryptoJS.pad.Pkcs7,
     });
 
@@ -59,7 +59,7 @@ export class Encryption {
     // Decrypt the data
     const decrypted = CryptoJS.AES.decrypt(cipherParams, derivedKey, {
       iv: CryptoJS.enc.Hex.parse(iv),
-      mode: CryptoJS.mode as any,
+      mode: this.ALGORITHM,
       padding: CryptoJS.pad.Pkcs7,
     });
 
