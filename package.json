@@ -41,6 +41,12 @@
   },
   "workspaces": [
     "packages/*",
-    "apps/*"
-  ]
+    "apps/*",
+    "apps/examples/*"
+  ],
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "crypto-js": "^4.2.0",
+    "winston-daily-rotate-file": "^4.7.1"
+  }
 }

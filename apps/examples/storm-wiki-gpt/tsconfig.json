@@ -1,0 +1,16 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["**/*.test.ts", "**/*.spec.ts", "node_modules", "dist"],
+  "references": [
+    { "path": "../../../packages/shared" },
+    { "path": "../../../packages/core" },
+    { "path": "../../../packages/llm-provider" }
+  ]
+}

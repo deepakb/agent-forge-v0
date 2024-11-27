@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 7
+    },
+    "auditLog": "logs/.81664ccc5f50e3fcf134f8931359c699dfc338f6-audit.json",
+    "files": [
+        {
+            "date": 1732698089874,
+            "name": "logs/agent-forge-2024-11-27.log",
+            "hash": "f70bf0800dea1b69ff2606783a106bbfeccc353dd53ff345f87a36eca7b687ba"
+        }
+    ],
+    "hashType": "sha256"
+}
