@@ -1,6 +1,6 @@
-import { Logger } from '@agent-forge/shared';
 import axios from 'axios';
 import { SearchResult, TavilySearchOptions } from '../types';
+import { LoggerService, LogContext } from './logger';
 import { config } from 'dotenv';
 import path from 'path';
 
@@ -10,16 +10,22 @@ config({ path: path.resolve(__dirname, '../../.env') });
 export class TavilyHelper {
   private static readonly API_KEY = process.env.TAVILY_API_KEY;
   private static readonly API_URL = 'https://api.tavily.com/search';
+  private static readonly logger = LoggerService.getInstance();
 
   public static async search(
     query: string,
     options: TavilySearchOptions = {}
   ): Promise<SearchResult[]> {
+    const startTime = Date.now();
+    const context: LogContext = {
+      component: 'TavilyHelper',
+      operation: 'search',
+    };
+
     try {
-      Logger.info('Performing Tavily search', {
+      this.logger.info('Initiating search request', {
+        ...context,
         query,
-        apiKeySet: !!this.API_KEY,
-        apiKeyValue: this.API_KEY,
       });
 
       if (!this.API_KEY) {
@@ -46,10 +52,13 @@ export class TavilyHelper {
       );
 
       const results = response.data.results || [];
+      const duration = Date.now() - startTime;
 
-      Logger.info('Tavily search completed', {
-        query,
+      this.logger.trace('search', {
+        ...context,
+        status: 'success',
         resultCount: results.length,
+        duration,
       });
 
       return results.map((result: any) => ({
@@ -59,19 +68,23 @@ export class TavilyHelper {
         score: result.score || 0,
       }));
     } catch (error) {
+      const duration = Date.now() - startTime;
+
       if (axios.isAxiosError(error)) {
-        Logger.error('Error performing Tavily search', {
-          query,
+        this.logger.error('Search request failed', {
+          ...context,
           error: {
             message: error.message,
             response: error.response?.data,
             status: error.response?.status,
           },
+          duration,
         });
       } else {
-        Logger.error('Error performing Tavily search', {
-          query,
-          error: error instanceof Error ? error.message : 'Unknown error',
+        this.logger.error('Search operation failed', {
+          ...context,
+          error,
+          duration,
         });
       }
       throw error;
