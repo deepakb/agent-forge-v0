@@ -1,77 +1,126 @@
+import { BaseAgent } from './base-agent';
+import { AgentMessage, MessageType, SearchResult, SynthesisAgentConfig, TaskResult } from '../types';
+import { OpenAIHelper } from '../utils/openai-helper';
 import { Logger } from '@agent-forge/shared';
 import { EventEmitter } from 'events';
-import { BaseWikiAgent } from './base-wiki-agent';
-import { OpenAIHelper } from '../utils/openai-helper';
-import {
-  AgentMessage,
-  AgentType,
-  MessageType,
-  SearchResult,
-  SearchResultsMessageData,
-  SynthesisResult,
-} from '../types';
 
-export class SynthesisAgent extends BaseWikiAgent {
+export class SynthesisAgent extends BaseAgent {
+  private openai: OpenAIHelper;
   private completionEmitter: EventEmitter;
 
-  constructor() {
-    super(AgentType.SYNTHESIS);
+  constructor(config: SynthesisAgentConfig) {
+    super(config);
+    this.openai = new OpenAIHelper(config);
     this.completionEmitter = new EventEmitter();
   }
 
-  public async handleMessage(message: AgentMessage): Promise<void> {
-    try {
-      Logger.info('SynthesisAgent handling message', {
-        messageType: message.type,
-      });
-
-      if (message.type === MessageType.SEARCH_RESULTS) {
-        const { query, results } = message.data as SearchResultsMessageData;
-        await this.handleSearchResults(query, results);
-      }
-    } catch (error) {
-      Logger.error('Error handling message in SynthesisAgent', {
-        messageType: message.type,
-        error,
-      });
-      throw error;
-    }
+  private generateTableOfContents(sections: string[]): string {
+    return `
+## Contents
+${sections.map((section, index) => `${index + 1}. [${section}](#${section.toLowerCase().replace(/\s+/g, '-')})`).join('\n')}
+`;
   }
 
-  private async handleSearchResults(query: string, results: SearchResult[]): Promise<void> {
+  public async handleMessage(message: AgentMessage): Promise<TaskResult> {
     try {
-      Logger.info('SynthesisAgent processing search results', {
-        query,
-        resultCount: results.length,
+      if (message.type !== MessageType.SEARCH_RESULTS) {
+        throw new Error(`Invalid message type for SynthesisAgent: ${message.type}`);
+      }
+
+      const searchResults = message.data as SearchResult[];
+      this.logger.info('Synthesizing article from search results', {
+        agentId: this.getId(),
+        resultCount: searchResults.length,
       });
 
-      // Generate summary using OpenAI
-      const summary = await OpenAIHelper.generateSummary(query, results);
+      // Prepare content for synthesis with source tracking
+      const contentForSynthesis = searchResults
+        .map((result, index) => `[Source ${index + 1}]
+Title: ${result.title}
+URL: ${result.url}
+Content: ${result.content}`)
+        .join('\n\n');
 
-      // Create synthesis result
-      const synthesisResult: SynthesisResult = {
-        query,
-        summary,
-        sources: results.map((result) => result.url),
+      const prompt = `You are tasked with writing a comprehensive Wikipedia-style article based on the provided search results. Follow these requirements carefully:
+
+1. Structure:
+   - Start with a brief lead section (no heading) that summarizes the topic
+   - Include a table of contents
+   - Organize content into logical sections with proper headings (use ## for main sections)
+   - Use subsections where appropriate (use ### for subsections)
+
+2. Content Guidelines:
+   - Write in an encyclopedic, neutral tone
+   - Focus on factual information
+   - Include relevant technical details
+   - Maintain objectivity
+   - Use formal language
+
+3. Citations:
+   - Add citations using [1], [2], etc.
+   - Include a References section at the end
+   - Link citations to the provided source URLs
+   - Add citations after key facts and claims
+
+4. Formatting:
+   - Use Markdown formatting
+   - Use bullet points or numbered lists where appropriate
+   - Include relevant section headings like:
+     * Overview/Introduction
+     * History
+     * Technical details/Technology
+     * Applications/Uses
+     * Impact/Significance
+     * Future developments
+     * See also
+     * References
+
+5. Special Elements:
+   - Add a "See also" section with related topics
+   - Include any relevant notes or external links
+
+Here are the search results to use as sources:
+
+${contentForSynthesis}
+
+Write the article now, ensuring proper citation of sources and Wikipedia-style formatting.`;
+
+      const article = await this.openai.complete(prompt);
+
+      this.logger.info('Article synthesis completed', {
+        agentId: this.getId(),
+        articleLength: article.length,
+      });
+
+      const nextMessage: AgentMessage = {
+        type: MessageType.ARTICLE,
+        source: this.getId(),
+        target: 'workflow',
+        data: article,
       };
 
-      // Emit completion event
-      this.completionEmitter.emit('synthesisComplete', synthesisResult);
+      await this.publishMessage(nextMessage);
 
-      Logger.info('SynthesisAgent completed synthesis', {
-        query,
-        summaryLength: summary.length,
+      // Emit completion event
+      this.completionEmitter.emit('synthesisComplete', { 
+        content: article, 
+        sources: searchResults.map(result => result.url) 
       });
+
+      return {
+        success: true,
+        message: nextMessage,
+      };
     } catch (error) {
-      Logger.error('Error processing search results in SynthesisAgent', {
-        query,
-        error,
-      });
-      throw error;
+      this.logger.error('Synthesis agent failed', error instanceof Error ? error : new Error('Unknown error'));
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
     }
   }
 
-  public onSynthesisComplete(callback: (result: SynthesisResult) => void): void {
+  public onSynthesisComplete(callback: (result: { content: string; sources: string[] }) => void): void {
     try {
       this.completionEmitter.on('synthesisComplete', callback);
       Logger.info('SynthesisAgent registered completion callback');
@@ -81,14 +130,12 @@ export class SynthesisAgent extends BaseWikiAgent {
     }
   }
 
-  public async start(): Promise<void> {
-    await super.start();
-    Logger.info('SynthesisAgent started successfully', { agentId: this.id });
+  public initialize(): void {
+    Logger.info('SynthesisAgent initialized successfully', { agentId: this.getId() });
   }
 
-  public async stop(): Promise<void> {
-    await super.stop();
+  public cleanup(): void {
     this.completionEmitter.removeAllListeners();
-    Logger.info('SynthesisAgent stopped successfully', { agentId: this.id });
+    Logger.info('SynthesisAgent cleaned up successfully', { agentId: this.getId() });
   }
 }

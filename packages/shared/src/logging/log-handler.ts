@@ -1,6 +1,5 @@
 import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
-
 import { structuredFormat } from './log-formatter';
 
 export interface LogHandlerConfig {
@@ -8,33 +7,50 @@ export interface LogHandlerConfig {
   maxSize?: string;
   maxFiles?: string;
   level?: string;
+  enableConsole?: boolean;
+  rotationFormat?: string;
 }
 
 export class LogHandler {
-  private logger: winston.Logger;
   private static instance: LogHandler;
+  private logger: winston.Logger;
 
   private constructor(config: LogHandlerConfig = {}) {
-    const { logDir = 'logs', maxSize = '10m', maxFiles = '7d', level = 'info' } = config;
+    const {
+      logDir = 'logs',
+      maxSize = '10m',
+      maxFiles = '7d',
+      level = 'info',
+      enableConsole = true,
+      rotationFormat = 'YYYY-MM-DD',
+    } = config;
 
-    const transport = new DailyRotateFile({
-      dirname: logDir,
-      filename: 'agent-forge-%DATE%.log',
-      datePattern: 'YYYY-MM-DD',
-      maxSize,
-      maxFiles,
-      format: structuredFormat,
-    });
+    const transports: winston.transport[] = [
+      new DailyRotateFile({
+        dirname: logDir,
+        filename: 'agent-forge-%DATE%.log',
+        datePattern: rotationFormat,
+        maxSize,
+        maxFiles,
+        format: structuredFormat,
+      }),
+    ];
+
+    if (enableConsole) {
+      transports.push(
+        new winston.transports.Console({
+          format: winston.format.combine(
+            winston.format.colorize(),
+            winston.format.simple()
+          ),
+        })
+      );
+    }
 
     this.logger = winston.createLogger({
       level,
       format: structuredFormat,
-      transports: [
-        transport,
-        new winston.transports.Console({
-          format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
-        }),
-      ],
+      transports,
     });
   }
 
@@ -45,10 +61,6 @@ export class LogHandler {
     return LogHandler.instance;
   }
 
-  public getLogger(): winston.Logger {
-    return this.logger;
-  }
-
   public async writeLog(
     level: string,
     message: string,
@@ -57,8 +69,7 @@ export class LogHandler {
     this.logger.log(level, message, metadata);
   }
 
-  public async rotateLog(): Promise<void> {
-    // Implement log rotation logic if needed beyond winston-daily-rotate-file
-    // This could include custom rotation strategies or cleanup
+  public getLogger(): winston.Logger {
+    return this.logger;
   }
 }

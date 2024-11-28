@@ -1,105 +1,71 @@
-import { Logger } from '@agent-forge/shared';
-import { BaseWikiAgent } from './base-wiki-agent';
+import { BaseAgent } from './base-agent';
+import { AgentMessage, FetchAgentConfig, MessageType, SearchResult, TaskResult } from '../types';
 import { TavilyHelper } from '../utils/tavily-helper';
-import {
-  AgentMessage,
-  AgentType,
-  MessageType,
-  Query,
-  QueryMessageData,
-  SearchResult,
-  SearchResultsMessageData,
-  TavilySearchOptions,
-} from '../types';
 
-export class FetchAgent extends BaseWikiAgent {
-  constructor() {
-    super(AgentType.FETCH);
+export class FetchAgent extends BaseAgent {
+  private tavily: TavilyHelper;
+  private synthesisAgentId: string;
+
+  constructor(config: FetchAgentConfig) {
+    super(config);
+    this.tavily = new TavilyHelper(config);
+    this.synthesisAgentId = config.synthesisAgentId;
   }
 
-  public async handleMessage(message: AgentMessage): Promise<void> {
+  public async handleMessage(message: AgentMessage): Promise<TaskResult> {
     try {
-      Logger.info('FetchAgent handling message', {
-        messageType: message.type,
-      });
-
-      if (message.type === MessageType.QUERY) {
-        const queryData = message.data as QueryMessageData;
-        await this.handleQueryMessage(queryData);
+      if (message.type !== MessageType.SEARCH_QUERIES) {
+        throw new Error(`Invalid message type for FetchAgent: ${message.type}`);
       }
-    } catch (error) {
-      Logger.error('Error handling message in FetchAgent', {
-        messageType: message.type,
-        error,
+
+      const queries = message.data as string[];
+      this.logger.info('Processing search queries', {
+        agentId: this.getId(),
+        queryCount: queries.length,
       });
-      throw error;
-    }
-  }
 
-  private async handleQueryMessage(query: Query): Promise<void> {
-    try {
-      Logger.info('FetchAgent processing query', { query });
+      const results: SearchResult[] = [];
+      for (const query of queries) {
+        try {
+          const queryResults = await this.tavily.search(query);
+          results.push(...queryResults);
+        } catch (error) {
+          this.logger.error('Failed to process query', error instanceof Error ? error : new Error('Unknown error'), {
+            agentId: this.getId(),
+            query,
+          });
+        }
+      }
 
-      // Prepare search options
-      const searchOptions: TavilySearchOptions = {
-        maxResults: query.maxResults,
-        searchDepth: 'advanced',
-      };
+      // Sort results by score and remove duplicates
+      const uniqueResults = Array.from(
+        new Map(results.map(r => [r.url, r])).values()
+      ).sort((a, b) => b.score - a.score);
 
-      // Perform search using TavilyHelper
-      const searchResults = await TavilyHelper.search(query.query, searchOptions);
+      this.logger.info('Search completed', {
+        agentId: this.getId(),
+        resultCount: uniqueResults.length,
+      });
 
-      // Format the results
-      const formattedResults = this.formatSearchResults(searchResults);
-
-      // Create search results message data
-      const searchResultsData: SearchResultsMessageData = {
-        query: query.query,
-        results: formattedResults,
-      };
-
-      // Send results to synthesis agent
-      await this.sendMessage({
+      const nextMessage: AgentMessage = {
         type: MessageType.SEARCH_RESULTS,
-        data: searchResultsData,
-        source: AgentType.FETCH,
-        target: AgentType.SYNTHESIS,
-      });
+        source: this.getId(),
+        target: this.synthesisAgentId,
+        data: uniqueResults,
+      };
 
-      Logger.info('FetchAgent sent search results', {
-        query: query.query,
-        resultCount: formattedResults.length,
-      });
+      await this.publishMessage(nextMessage);
+
+      return {
+        success: true,
+        message: nextMessage,
+      };
     } catch (error) {
-      Logger.error('Error processing query in FetchAgent', {
-        query,
-        error,
-      });
-      throw error;
+      this.logger.error('Fetch agent failed', error instanceof Error ? error : new Error('Unknown error'));
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
     }
-  }
-
-  private formatSearchResults(results: any[]): SearchResult[] {
-    try {
-      return results.map((result) => ({
-        title: result.title || '',
-        url: result.url || '',
-        content: result.content || '',
-        score: result.score || 0,
-      }));
-    } catch (error) {
-      Logger.error('Error formatting search results', { error });
-      throw error;
-    }
-  }
-
-  public async start(): Promise<void> {
-    await super.start();
-    Logger.info('FetchAgent started successfully', { agentId: this.id });
-  }
-
-  public async stop(): Promise<void> {
-    await super.stop();
-    Logger.info('FetchAgent stopped successfully', { agentId: this.id });
   }
 }

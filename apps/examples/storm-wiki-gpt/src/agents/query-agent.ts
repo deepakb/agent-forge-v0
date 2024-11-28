@@ -1,54 +1,108 @@
-import { Logger } from '@agent-forge/shared';
-import { BaseWikiAgent } from './base-wiki-agent';
-import { AgentMessage, AgentType, MessageType, Query } from '../types';
+import { BaseAgent } from './base-agent';
+import { AgentMessage, MessageType, QueryAgentConfig, TaskResult } from '../types';
+import { OpenAIHelper } from '../utils/openai-helper';
 
-export class QueryAgent extends BaseWikiAgent {
-  constructor() {
-    super(AgentType.QUERY);
+export class QueryAgent extends BaseAgent {
+  private openai: OpenAIHelper;
+  private fetchAgentId: string;
+
+  constructor(config: QueryAgentConfig) {
+    super(config);
+    this.openai = new OpenAIHelper(config);
+    this.fetchAgentId = config.fetchAgentId;
   }
 
-  public async handleMessage(message: AgentMessage): Promise<void> {
+  private extractJSONArray(text: string): string[] {
     try {
-      Logger.info('QueryAgent handling message', {
-        messageType: message.type,
-      });
-    } catch (error) {
-      Logger.error('Error handling message in QueryAgent', {
-        messageType: message.type,
-        error,
-      });
-      throw error;
+      // First try direct JSON parse
+      return JSON.parse(text);
+    } catch (e) {
+      // Try to find JSON array in text
+      const match = text.match(/\[[\s\S]*\]/);
+      if (match) {
+        try {
+          return JSON.parse(match[0]);
+        } catch (e) {
+          throw new Error('Failed to parse JSON array from response');
+        }
+      }
+      throw new Error('No JSON array found in response');
     }
   }
 
-  public async processQuery(query: Query): Promise<void> {
+  public async handleMessage(message: AgentMessage): Promise<TaskResult> {
     try {
-      Logger.info('QueryAgent processing query', { query });
+      if (message.type !== MessageType.TOPIC) {
+        throw new Error(`Invalid message type for QueryAgent: ${message.type}`);
+      }
 
-      await this.sendMessage({
-        type: MessageType.QUERY,
-        data: query,
-        source: AgentType.QUERY,
-        target: AgentType.FETCH,
+      const topic = message.data as string;
+      this.logger.info('Generating search queries', {
+        agentId: this.getId(),
+        topic,
       });
 
-      Logger.info('QueryAgent sent query to FetchAgent', { query });
+      const prompt = `Generate 3-5 specific search queries to gather comprehensive information about "${topic}" for writing a Wikipedia-style article. Each query should focus on different aspects of the topic.
+
+Requirements:
+1. Return ONLY a JSON array of strings
+2. Each string should be a complete search query
+3. Do not include any other text or explanation
+
+Example response format:
+["query 1", "query 2", "query 3"]`;
+
+      const response = await this.openai.complete(prompt);
+      let queries: string[];
+      
+      try {
+        queries = this.extractJSONArray(response);
+        if (!Array.isArray(queries)) {
+          throw new Error('Response is not an array');
+        }
+        
+        // Clean and validate queries
+        queries = queries
+          .filter(query => typeof query === 'string' && query.trim().length > 0)
+          .map(query => query.trim());
+          
+        if (queries.length === 0) {
+          throw new Error('No valid queries found in response');
+        }
+      } catch (error) {
+        const errorObj = error instanceof Error ? error : new Error('Unknown error');
+        this.logger.error('Failed to parse OpenAI response', errorObj, {
+          response,
+        });
+        queries = [topic]; // Fallback to using the topic as a query
+      }
+
+      this.logger.info('Generated search queries', {
+        agentId: this.getId(),
+        queryCount: queries.length,
+        queries, // Log queries for debugging
+      });
+
+      const nextMessage: AgentMessage = {
+        type: MessageType.SEARCH_QUERIES,
+        source: this.getId(),
+        target: this.fetchAgentId,
+        data: queries,
+      };
+
+      await this.publishMessage(nextMessage);
+
+      return {
+        success: true,
+        message: nextMessage,
+      };
     } catch (error) {
-      Logger.error('Error processing query in QueryAgent', {
-        query,
-        error,
-      });
-      throw error;
+      const errorObj = error instanceof Error ? error : new Error('Unknown error');
+      this.logger.error('Query agent failed', errorObj);
+      return {
+        success: false,
+        error: errorObj.message,
+      };
     }
-  }
-
-  public async start(): Promise<void> {
-    await super.start();
-    Logger.info('QueryAgent started successfully', { agentId: this.id });
-  }
-
-  public async stop(): Promise<void> {
-    await super.stop();
-    Logger.info('QueryAgent stopped successfully', { agentId: this.id });
   }
 }

@@ -1,74 +1,86 @@
 import { z } from 'zod';
-import { Task as BaseTask } from '@agent-forge/core';
-
-export interface Task extends BaseTask {
-  id: string;
-  type: string;
-  data: unknown;
-}
-
-export enum AgentType {
-  QUERY = 'QUERY',
-  FETCH = 'FETCH',
-  SYNTHESIS = 'SYNTHESIS',
-}
 
 export enum MessageType {
-  QUERY = 'QUERY',
+  TOPIC = 'TOPIC',
+  SEARCH_QUERIES = 'SEARCH_QUERIES',
   SEARCH_RESULTS = 'SEARCH_RESULTS',
-  SYNTHESIS_COMPLETE = 'SYNTHESIS_COMPLETE',
+  ARTICLE = 'ARTICLE',
 }
 
-export const QuerySchema = z.object({
-  query: z.string(),
-  maxResults: z.number().optional(),
-});
-
-export type Query = z.infer<typeof QuerySchema>;
-
+// Zod Schemas for Runtime Type Validation
 export const SearchResultSchema = z.object({
+  url: z.string().url(),
   title: z.string(),
-  url: z.string(),
   content: z.string(),
   score: z.number(),
 });
 
-export type SearchResult = z.infer<typeof SearchResultSchema>;
-
-export const SynthesisResultSchema = z.object({
-  query: z.string(),
-  summary: z.string(),
-  sources: z.array(z.string()),
-});
-
-export type SynthesisResult = z.infer<typeof SynthesisResultSchema>;
-
-export interface TavilySearchOptions {
-  maxResults?: number;
-  searchDepth?: 'basic' | 'advanced';
-  includeUrls?: string[];
-  excludeUrls?: string[];
-  includeDomainsOnly?: string[];
-  excludeDomainsOnly?: string[];
-}
-
-export interface QueryMessageData {
-  query: string;
-  maxResults?: number;
-}
-
-export interface SearchResultsMessageData {
-  query: string;
-  results: SearchResult[];
-}
-
-export interface SynthesisCompleteMessageData extends SynthesisResult {}
-
 export const AgentMessageSchema = z.object({
-  type: z.enum([MessageType.QUERY, MessageType.SEARCH_RESULTS, MessageType.SYNTHESIS_COMPLETE]),
-  data: z.union([QuerySchema, SearchResultSchema, SynthesisResultSchema]),
-  source: z.enum([AgentType.QUERY, AgentType.FETCH, AgentType.SYNTHESIS]),
-  target: z.enum([AgentType.QUERY, AgentType.FETCH, AgentType.SYNTHESIS]).optional(),
+  type: z.nativeEnum(MessageType),
+  source: z.string(),
+  target: z.string(),
+  data: z.any(),
 });
 
+export const BaseAgentConfigSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  type: z.string().optional(),
+  agentType: z.string(),
+  capabilities: z.array(z.string()).optional(),
+  maxConcurrentTasks: z.number().optional(),
+  retryAttempts: z.number().optional(),
+  openaiApiKey: z.string(),
+  tavilyApiKey: z.string(),
+  logLevel: z.string().optional(),
+  maxRetries: z.number().optional(),
+  timeout: z.number().optional(),
+});
+
+export const QueryAgentConfigSchema = BaseAgentConfigSchema.extend({
+  fetchAgentId: z.string(),
+});
+
+export const FetchAgentConfigSchema = BaseAgentConfigSchema.extend({
+  synthesisAgentId: z.string(),
+});
+
+export const SynthesisAgentConfigSchema = BaseAgentConfigSchema;
+
+// Task Types
+export interface Task {
+  id: string;
+  agentId: string;
+  message: AgentMessage;
+}
+
+export interface TaskResult {
+  success: boolean;
+  data?: unknown;
+  error?: string;
+  message?: AgentMessage;
+}
+
+export interface TaskConfig {
+  id: string;
+  type: string;
+  priority: string;
+  retryAttempts: number;
+  dependencies: string[];
+  requiredCapabilities: string[];
+}
+
+export interface TaskMetadata {
+  status: string;
+  createdAt: Date;
+  attempts: number;
+  progress: number;
+}
+
+// Agent Types
+export type SearchResult = z.infer<typeof SearchResultSchema>;
 export type AgentMessage = z.infer<typeof AgentMessageSchema>;
+export type BaseAgentConfig = z.infer<typeof BaseAgentConfigSchema>;
+export type QueryAgentConfig = z.infer<typeof QueryAgentConfigSchema>;
+export type FetchAgentConfig = z.infer<typeof FetchAgentConfigSchema>;
+export type SynthesisAgentConfig = z.infer<typeof SynthesisAgentConfigSchema>;

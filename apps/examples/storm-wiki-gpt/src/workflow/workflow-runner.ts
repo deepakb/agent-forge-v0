@@ -1,120 +1,188 @@
-import { Logger } from '@agent-forge/shared';
 import { EventEmitter } from 'events';
-import { FetchAgent } from '../agents/fetch-agent';
+import { v4 as uuidv4 } from 'uuid';
 import { QueryAgent } from '../agents/query-agent';
+import { FetchAgent } from '../agents/fetch-agent';
 import { SynthesisAgent } from '../agents/synthesis-agent';
-import { Query, SynthesisResult } from '../types';
+import { LoggerService } from '../utils/logger';
+import {
+  MessageType,
+  AgentMessage,
+  QueryAgentConfig,
+  FetchAgentConfig,
+  SynthesisAgentConfig,
+  Task,
+  TaskResult,
+} from '../types';
+
+interface WorkflowError extends Error {
+  workflowId?: string;
+}
 
 export class WorkflowRunner {
+  private emitter: EventEmitter;
+  private logger: LoggerService;
+  private workflowId: string;
+  private queryAgentId: string;
+  private fetchAgentId: string;
+  private synthesisAgentId: string;
   private queryAgent: QueryAgent;
   private fetchAgent: FetchAgent;
   private synthesisAgent: SynthesisAgent;
-  private eventEmitter: EventEmitter;
-  private isRunning: boolean = false;
 
-  constructor() {
+  constructor(
+    openaiApiKey: string,
+    tavilyApiKey: string,
+    topic: string,
+  ) {
+    this.workflowId = uuidv4();
+    this.emitter = new EventEmitter();
+    this.logger = LoggerService.getInstance();
+
+    // Generate unique IDs for agents
+    this.queryAgentId = `query-agent-${uuidv4()}`;
+    this.fetchAgentId = `fetch-agent-${uuidv4()}`;
+    this.synthesisAgentId = `synthesis-agent-${uuidv4()}`;
+
+    // Initialize agents with proper configurations
+    const queryAgentConfig: QueryAgentConfig = {
+      agentType: 'query',
+      openaiApiKey,
+      tavilyApiKey,
+      id: this.queryAgentId,
+      fetchAgentId: this.fetchAgentId,
+    };
+
+    const fetchAgentConfig: FetchAgentConfig = {
+      agentType: 'fetch',
+      openaiApiKey,
+      tavilyApiKey,
+      id: this.fetchAgentId,
+      synthesisAgentId: this.synthesisAgentId,
+    };
+
+    const synthesisAgentConfig: SynthesisAgentConfig = {
+      agentType: 'synthesis',
+      openaiApiKey,
+      tavilyApiKey,
+      id: this.synthesisAgentId,
+    };
+
     try {
-      Logger.info('Initializing WorkflowRunner');
-      this.eventEmitter = new EventEmitter();
-      this.queryAgent = new QueryAgent();
-      this.fetchAgent = new FetchAgent();
-      this.synthesisAgent = new SynthesisAgent();
-      Logger.info('WorkflowRunner initialized successfully');
-    } catch (error) {
-      Logger.error('Error initializing WorkflowRunner', { error });
-      throw error;
-    }
-  }
+      // Initialize agents
+      this.queryAgent = new QueryAgent(queryAgentConfig);
+      this.fetchAgent = new FetchAgent(fetchAgentConfig);
+      this.synthesisAgent = new SynthesisAgent(synthesisAgentConfig);
 
-  public async start(): Promise<void> {
-    try {
-      if (this.isRunning) {
-        Logger.warn('WorkflowRunner is already running');
-        return;
-      }
-
-      Logger.info('Starting WorkflowRunner');
-      await Promise.all([
-        this.queryAgent.start(),
-        this.fetchAgent.start(),
-        this.synthesisAgent.start(),
-      ]);
-
-      this.setupEventHandlers();
-      this.isRunning = true;
-      Logger.info('WorkflowRunner started successfully');
-    } catch (error) {
-      Logger.error('Error starting WorkflowRunner', { error });
-      throw error;
-    }
-  }
-
-  public async stop(): Promise<void> {
-    try {
-      if (!this.isRunning) {
-        Logger.warn('WorkflowRunner is not running');
-        return;
-      }
-
-      Logger.info('Stopping WorkflowRunner');
-      await Promise.all([
-        this.queryAgent.stop(),
-        this.fetchAgent.stop(),
-        this.synthesisAgent.stop(),
-      ]);
-
-      this.isRunning = false;
-      Logger.info('WorkflowRunner stopped successfully');
-    } catch (error) {
-      Logger.error('Error stopping WorkflowRunner', { error });
-      throw error;
-    }
-  }
-
-  public async processQuery(query: Query): Promise<void> {
-    try {
-      if (!this.isRunning) {
-        throw new Error('WorkflowRunner must be started before processing queries');
-      }
-
-      Logger.info('Processing query', { query });
-      await this.queryAgent.processQuery(query);
-    } catch (error) {
-      Logger.error('Error processing query', { query, error });
-      throw error;
-    }
-  }
-
-  public onWorkflowComplete(callback: (result: SynthesisResult) => void): void {
-    try {
-      Logger.info('Registering workflow completion callback');
-      this.eventEmitter.on('workflowComplete', callback);
-    } catch (error) {
-      Logger.error('Error registering workflow completion callback', { error });
-      throw error;
-    }
-  }
-
-  private setupEventHandlers(): void {
-    try {
-      Logger.info('Setting up event handlers');
-
-      this.synthesisAgent.onSynthesisComplete((result: SynthesisResult) => {
-        try {
-          Logger.info('Synthesis complete, emitting workflowComplete event', {
-            query: result.query,
-          });
-          this.eventEmitter.emit('workflowComplete', result);
-        } catch (error) {
-          Logger.error('Error handling synthesis completion', { error });
-          throw error;
-        }
+      this.logger.info('All agents initialized successfully', {
+        workflowId: this.workflowId,
+        queryAgentId: this.queryAgentId,
+        fetchAgentId: this.fetchAgentId,
+        synthesisAgentId: this.synthesisAgentId,
       });
 
-      Logger.info('Event handlers set up successfully');
+      // Start the workflow with the topic
+      this.startWorkflow(topic).catch((error) => {
+        const workflowError = error as WorkflowError;
+        workflowError.workflowId = this.workflowId;
+        this.logger.error('Workflow failed', workflowError);
+      });
     } catch (error) {
-      Logger.error('Error setting up event handlers', { error });
+      const workflowError = error as WorkflowError;
+      workflowError.workflowId = this.workflowId;
+      this.logger.error('Failed to initialize workflow', workflowError);
       throw error;
     }
+  }
+
+  private async startWorkflow(topic: string): Promise<void> {
+    try {
+      const startTime = this.logger.startOperation('workflow_execution', {
+        workflowId: this.workflowId,
+        topic,
+      });
+
+      // Create initial message
+      const initialMessage: AgentMessage = {
+        type: MessageType.TOPIC,
+        source: 'workflow',
+        target: this.queryAgentId,
+        data: topic,
+      };
+
+      // Create and submit initial task
+      const task: Task = {
+        id: uuidv4(),
+        agentId: this.queryAgentId,
+        message: initialMessage,
+      };
+
+      const result = await this.submitTask(task);
+      await this.handleTaskResult(result);
+
+      this.logger.endOperation('workflow_execution', startTime, {
+        workflowId: this.workflowId,
+        topic,
+        status: 'completed',
+      });
+    } catch (error) {
+      const workflowError = error as WorkflowError;
+      workflowError.workflowId = this.workflowId;
+      this.logger.error('Error in workflow execution', workflowError);
+      throw error;
+    }
+  }
+
+  private async submitTask(task: Task): Promise<TaskResult> {
+    const agent = this.getAgent(task.agentId);
+    if (!agent) {
+      throw new Error(`Agent not found for ID: ${task.agentId}`);
+    }
+    return agent.handleMessage(task.message);
+  }
+
+  private getAgent(agentId: string): QueryAgent | FetchAgent | SynthesisAgent | undefined {
+    if (agentId === this.queryAgentId) return this.queryAgent;
+    if (agentId === this.fetchAgentId) return this.fetchAgent;
+    if (agentId === this.synthesisAgentId) return this.synthesisAgent;
+    return undefined;
+  }
+
+  private async handleTaskResult(result: TaskResult): Promise<void> {
+    try {
+      if (!result.message) {
+        throw new Error('Task result missing message');
+      }
+
+      const message = result.message;
+      
+      if (message.type === MessageType.ARTICLE) {
+        // Workflow complete
+        this.logger.info('Workflow completed successfully', {
+          workflowId: this.workflowId,
+          articleLength: (message.data as string).length,
+        });
+        this.emitter.emit('complete', message.data);
+        return;
+      }
+
+      // Create and submit next task
+      const task: Task = {
+        id: uuidv4(),
+        agentId: message.target,
+        message,
+      };
+
+      const nextResult = await this.submitTask(task);
+      await this.handleTaskResult(nextResult);
+    } catch (error) {
+      const workflowError = error as WorkflowError;
+      workflowError.workflowId = this.workflowId;
+      this.logger.error('Error in task result handler', workflowError);
+      throw error;
+    }
+  }
+
+  public onComplete(callback: (result: unknown) => void): void {
+    this.emitter.on('complete', callback);
   }
 }

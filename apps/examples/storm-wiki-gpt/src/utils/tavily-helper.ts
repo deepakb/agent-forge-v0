@@ -1,93 +1,101 @@
-import axios from 'axios';
-import { SearchResult, TavilySearchOptions } from '../types';
-import { LoggerService, LogContext } from './logger';
-import { config } from 'dotenv';
-import path from 'path';
-
-// Load environment variables
-config({ path: path.resolve(__dirname, '../../.env') });
+import { BaseAgentConfig, SearchResult } from '../types';
+import { LoggerService } from './logger';
 
 export class TavilyHelper {
-  private static readonly API_KEY = process.env.TAVILY_API_KEY;
-  private static readonly API_URL = 'https://api.tavily.com/search';
-  private static readonly logger = LoggerService.getInstance();
+  private apiKey: string;
+  private logger: LoggerService;
+  private retryDelay = 1000; // Start with 1 second
+  private maxRetries = 3;
 
-  public static async search(
-    query: string,
-    options: TavilySearchOptions = {}
-  ): Promise<SearchResult[]> {
-    const startTime = Date.now();
-    const context: LogContext = {
-      component: 'TavilyHelper',
-      operation: 'search',
-    };
+  constructor(config: BaseAgentConfig) {
+    this.logger = LoggerService.getInstance();
 
+    if (!config.tavilyApiKey) {
+      const error = new Error('Tavily API key is required');
+      this.logger.error('Failed to initialize TavilyHelper', error);
+      throw error;
+    }
+
+    this.apiKey = config.tavilyApiKey;
+    this.logger.info('TavilyHelper initialized successfully');
+  }
+
+  private async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private async searchWithRetry(query: string, attempt = 1): Promise<SearchResult[]> {
     try {
-      this.logger.info('Initiating search request', {
-        ...context,
-        query,
+      const response = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          query,
+          search_depth: 'advanced',
+          include_answer: false,
+          include_raw_content: false,
+          include_domains: [],
+          exclude_domains: [],
+        }),
       });
 
-      if (!this.API_KEY) {
-        throw new Error('TAVILY_API_KEY environment variable is not set');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const error = new Error(`Tavily API error: ${response.status} - ${response.statusText}`);
+        this.logger.error('API request failed', error, {
+          statusCode: response.status,
+          statusText: response.statusText,
+          errorData,
+        });
+        throw error;
       }
 
-      const response = await axios.post(
-        this.API_URL,
-        {
-          query,
-          max_results: options.maxResults || 3,
-          search_depth: options.searchDepth || 'advanced',
-          include_urls: options.includeUrls,
-          exclude_urls: options.excludeUrls,
-          include_domains: options.includeDomainsOnly,
-          exclude_domains: options.excludeDomainsOnly,
-          api_key: this.API_KEY,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const data = await response.json();
+      if (!data.results || !Array.isArray(data.results)) {
+        throw new Error('Invalid response format from Tavily API');
+      }
 
-      const results = response.data.results || [];
-      const duration = Date.now() - startTime;
-
-      this.logger.trace('search', {
-        ...context,
-        status: 'success',
-        resultCount: results.length,
-        duration,
-      });
-
-      return results.map((result: any) => ({
-        title: result.title || '',
-        url: result.url || '',
-        content: result.content || '',
-        score: result.score || 0,
+      return data.results.map((result: any) => ({
+        url: result.url,
+        title: result.title,
+        content: result.content,
+        score: result.relevance_score || 0,
       }));
     } catch (error) {
-      const duration = Date.now() - startTime;
-
-      if (axios.isAxiosError(error)) {
-        this.logger.error('Search request failed', {
-          ...context,
-          error: {
-            message: error.message,
-            response: error.response?.data,
-            status: error.response?.status,
-          },
-          duration,
-        });
-      } else {
-        this.logger.error('Search operation failed', {
-          ...context,
-          error,
-          duration,
-        });
+      if (error instanceof Error) {
+        if (attempt <= this.maxRetries) {
+          const nextDelay = this.retryDelay * Math.pow(2, attempt - 1);
+          this.logger.info('Retrying Tavily API request...', {
+            attempt,
+            nextDelay,
+            errorMessage: error.message,
+          });
+          await this.delay(nextDelay);
+          return this.searchWithRetry(query, attempt + 1);
+        }
       }
       throw error;
+    }
+  }
+
+  public async search(query: string): Promise<SearchResult[]> {
+    try {
+      this.logger.info('Starting Tavily search', { query });
+      const results = await this.searchWithRetry(query);
+      this.logger.info('Tavily search completed', {
+        query,
+        resultCount: results.length,
+      });
+      return results;
+    } catch (error) {
+      const errorObj = error instanceof Error ? error : new Error('Unknown error');
+      this.logger.error('Tavily search failed', errorObj, {
+        query,
+      });
+      throw errorObj;
     }
   }
 }

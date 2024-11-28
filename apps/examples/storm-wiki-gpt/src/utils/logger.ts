@@ -1,29 +1,26 @@
-import { Logger } from '@agent-forge/shared';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface LogContext {
+  component?: string;
+  operation?: string;
+  status?: string;
+  workflowId?: string;
   agentId?: string;
   agentType?: string;
-  operation?: string;
-  component?: string;
-  messageType?: string;
-  duration?: number;
-  status?: 'success' | 'error' | 'warning' | 'info';
   query?: string;
-  nodeEnv?: string;
-  missingVars?: string[];
   resultCount?: number;
-  articleLength?: number;
-  sourceCount?: number;
-  summaryLength?: number;
-  error?: any;
-  [key: string]: any; // Allow additional properties
+  durationMs?: number;
+  error?: Error;
+  [key: string]: any;
 }
 
 export class LoggerService {
   private static instance: LoggerService;
-  
+  private currentWorkflowId?: string;
+  private operationStartTimes: Map<string, Date>;
+
   private constructor() {
-    Logger.initialize();
+    this.operationStartTimes = new Map();
   }
 
   public static getInstance(): LoggerService {
@@ -33,66 +30,89 @@ export class LoggerService {
     return LoggerService.instance;
   }
 
-  private formatMessage(message: string, context: LogContext): string {
-    return `[${context.component || 'System'}] ${message}`;
+  public trace(message: string, context?: LogContext): void {
+    this.log('trace', message, context);
   }
 
-  private formatContext(context: LogContext): Record<string, any> {
-    const timestamp = new Date().toISOString();
-    return {
-      ...context,
-      timestamp,
-    };
+  public debug(message: string, context?: LogContext): void {
+    this.log('debug', message, context);
   }
 
-  public info(message: string, context: LogContext): void {
-    Logger.info(
-      this.formatMessage(message, context),
-      this.formatContext(context)
-    );
+  public info(message: string, context?: LogContext): void {
+    this.log('info', message, context);
   }
 
-  public error(message: string, context: LogContext & { error?: any }): void {
-    const errorDetails = context.error instanceof Error ? {
-      name: context.error.name,
-      message: context.error.message,
-      stack: context.error.stack,
-    } : context.error;
-
-    Logger.error(
-      this.formatMessage(message, context),
-      this.formatContext({
-        ...context,
-        error: errorDetails,
-        status: 'error',
-      })
-    );
+  public warn(message: string, context?: LogContext): void {
+    this.log('warn', message, context);
   }
 
-  public warn(message: string, context: LogContext): void {
-    Logger.warn(
-      this.formatMessage(message, context),
-      this.formatContext({ ...context, status: 'warning' })
-    );
+  public error(message: string, error: Error, context?: LogContext): void {
+    this.log('error', message, { ...context, error });
   }
 
-  public debug(message: string, context: LogContext): void {
-    if (process.env.NODE_ENV === 'development') {
-      Logger.debug(
-        this.formatMessage(message, context),
-        this.formatContext(context)
-      );
+  public fatal(message: string, error: Error, context?: LogContext): void {
+    this.log('fatal', message, { ...context, error });
+  }
+
+  public startWorkflow(context?: LogContext): string {
+    const workflowId = uuidv4();
+    this.currentWorkflowId = workflowId;
+    this.info('Starting workflow', { ...context, workflowId });
+    return workflowId;
+  }
+
+  public endWorkflow(context?: LogContext): void {
+    if (this.currentWorkflowId) {
+      this.info('Ending workflow', { ...context, workflowId: this.currentWorkflowId });
+      this.currentWorkflowId = undefined;
     }
   }
 
-  public trace(operation: string, context: LogContext, durationMs?: number): void {
-    Logger.info(
-      this.formatMessage(`Operation completed: ${operation}`, context),
-      this.formatContext({
-        ...context,
-        operation,
-        duration: durationMs,
-      })
-    );
+  public startOperation(operation: string, context?: LogContext): Date {
+    const startTime = new Date();
+    const operationId = uuidv4();
+    this.operationStartTimes.set(operationId, startTime);
+    this.info(`Starting ${operation}`, {
+      ...context,
+      operation,
+      workflowId: this.currentWorkflowId,
+      operationId,
+    });
+    return startTime;
+  }
+
+  public endOperation(operation: string, startTime: Date, context?: LogContext): void {
+    const endTime = new Date();
+    const durationMs = endTime.getTime() - startTime.getTime();
+    this.info(`Completed ${operation}`, {
+      ...context,
+      operation,
+      workflowId: this.currentWorkflowId,
+      durationMs,
+    });
+  }
+
+  public logAgentAction(agentId: string, action: string, context?: LogContext): void {
+    this.info(`Agent ${action}`, {
+      ...context,
+      agentId,
+      action,
+      workflowId: this.currentWorkflowId,
+    });
+  }
+
+  private log(level: string, message: string, context?: LogContext): void {
+    const timestamp = new Date().toISOString();
+    const logEntry = {
+      timestamp,
+      level,
+      message,
+      ...context,
+      workflowId: context?.workflowId || this.currentWorkflowId,
+    };
+
+    // For now, just console.log the entry
+    // In production, this would use a proper logging framework
+    console.log(JSON.stringify(logEntry));
   }
 }

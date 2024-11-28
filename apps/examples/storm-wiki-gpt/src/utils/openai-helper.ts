@@ -1,52 +1,46 @@
 import OpenAI from 'openai';
-import { SearchResult } from '../types';
-import { LoggerService, LogContext } from './logger';
+import { BaseAgentConfig } from '../types';
+import { LoggerService } from './logger';
 
 export class OpenAIHelper {
-  private static readonly openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-  private static readonly logger = LoggerService.getInstance();
+  private openai: OpenAI;
+  private logger: LoggerService;
+  private retryDelay = 1000; // Start with 1 second
+  private maxRetries = 3;
 
-  public static async generateSummary(
-    query: string,
-    results: SearchResult[]
-  ): Promise<string> {
-    const startTime = Date.now();
-    const context: LogContext = {
-      component: 'OpenAIHelper',
-      operation: 'generateSummary',
-    };
+  constructor(config: BaseAgentConfig) {
+    this.logger = LoggerService.getInstance();
 
+    if (!config.openaiApiKey) {
+      const error = new Error('OpenAI API key is required');
+      this.logger.error('Failed to initialize OpenAIHelper', error);
+      throw error;
+    }
+    
     try {
-      this.logger.info('Initiating summary generation', {
-        ...context,
-        query,
-        sourceCount: results.length,
+      this.openai = new OpenAI({
+        apiKey: config.openaiApiKey,
       });
+      this.logger.info('OpenAIHelper initialized successfully');
+    } catch (error) {
+      const wrappedError = error instanceof Error ? error : new Error('Unknown error during OpenAI initialization');
+      this.logger.error('Failed to initialize OpenAI client', wrappedError);
+      throw wrappedError;
+    }
+  }
 
-      const prompt = `Generate a comprehensive Wikipedia-style article about "${query}" using the provided sources. 
-      
-Requirements:
-1. Follow Wikipedia's neutral point of view (NPOV) and formal tone
-2. Include proper sections with == Section == headers
-3. Add citations using [n] format, linking to the provided sources
-4. Include a "References" section at the end
-5. Focus on accuracy and factual information
-6. Use proper Wikipedia formatting for quotes, emphasis, and lists
+  private async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
 
-Sources to cite:
-${results.map((result, index) => `[${index + 1}] ${result.url}`).join('\n')}
-
-Content from sources:
-${results.map(result => result.content).join('\n\n')}`;
-
+  private async completeWithRetry(prompt: string, attempt = 1): Promise<string> {
+    try {
       const response = await this.openai.chat.completions.create({
-        model: 'gpt-4',
+        model: 'gpt-3.5-turbo',
         messages: [
           {
             role: 'system',
-            content: 'You are a Wikipedia editor who creates well-researched, properly formatted articles with accurate citations.',
+            content: 'You are a helpful assistant focused on providing clear, concise, and accurate information.',
           },
           {
             role: 'user',
@@ -54,34 +48,77 @@ ${results.map(result => result.content).join('\n\n')}`;
           },
         ],
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: 1000,
       });
 
-      const summary = response.choices[0]?.message?.content || '';
-      const duration = Date.now() - startTime;
+      const result = response.choices[0]?.message?.content?.trim();
       
-      this.logger.trace('generateSummary', {
-        ...context,
-        status: 'success',
-        summaryLength: summary.length,
-        duration,
-      });
+      if (!result) {
+        throw new Error('OpenAI returned empty response');
+      }
 
-      return summary;
+      // Reset retry delay on success
+      this.retryDelay = 1000;
+
+      return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
+      const wrappedError = error instanceof Error ? error : new Error('Unknown error during OpenAI completion');
+      const errorMessage = wrappedError.message;
       
-      this.logger.error('Summary generation failed', {
-        ...context,
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message,
-          stack: error.stack,
-        } : error,
-        duration,
+      // Check for rate limiting errors
+      if (
+        errorMessage.toLowerCase().includes('rate limit') ||
+        (error instanceof OpenAI.APIError && error.status === 429)
+      ) {
+        if (attempt <= this.maxRetries) {
+          this.logger.info('Rate limited by OpenAI API, retrying...', {
+            attempt,
+            retryDelay: this.retryDelay,
+          });
+
+          await this.delay(this.retryDelay);
+          // Exponential backoff
+          this.retryDelay *= 2;
+          return this.completeWithRetry(prompt, attempt + 1);
+        }
+        const rateLimitError = new Error(`Rate limited by OpenAI API after ${attempt} attempts`);
+        this.logger.error('Rate limit exceeded', rateLimitError);
+        throw rateLimitError;
+      }
+      throw wrappedError;
+    }
+  }
+
+  public async complete(prompt: string): Promise<string> {
+    try {
+      const startTime = this.logger.startOperation('openai_completion', {
+        promptLength: prompt.length,
       });
-      
-      throw error;
+
+      this.logger.info('Starting OpenAI completion', {
+        promptLength: prompt.length,
+      });
+
+      const result = await this.completeWithRetry(prompt);
+
+      this.logger.info('OpenAI completion successful', {
+        promptLength: prompt.length,
+        responseLength: result.length,
+      });
+
+      this.logger.endOperation('openai_completion', startTime, {
+        promptLength: prompt.length,
+        responseLength: result.length,
+      });
+
+      return result;
+    } catch (error) {
+      const wrappedError = error instanceof Error ? error : new Error('Unknown error during OpenAI completion');
+      this.logger.error('OpenAI completion failed', wrappedError, {
+        promptLength: prompt.length,
+        errorMessage: wrappedError.message,
+      });
+      throw wrappedError;
     }
   }
 }
