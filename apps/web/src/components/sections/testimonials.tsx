@@ -3,57 +3,55 @@ import { Container } from '@/components/ui/container'
 
 const testimonials = [
   {
-    quote: "Agent Forge has transformed how we handle customer service. The AI agents are incredibly effective.",
+    quote: "Agent Forge has transformed how we handle customer support. The AI agents are incredibly effective.",
     author: "Sarah Chen",
-    role: "CTO at TechCorp",
-    avatar: "/testimonials/avatar1.svg"
+    title: "CTO, TechCorp",
+    avatar: "/avatars/avatar-1.jpg"
   },
   {
-    quote: "The enterprise features and security compliance made the decision to adopt Agent Forge easy.",
+    quote: "The scalability and reliability of Agent Forge is unmatched. It's become essential to our operations.",
     author: "Michael Rodriguez",
-    role: "Head of AI at Enterprise Co",
-    avatar: "/testimonials/avatar2.svg"
+    title: "Head of AI, DataFlow",
+    avatar: "/avatars/avatar-2.jpg"
   },
   {
-    quote: "We've seen a 300% improvement in our data processing efficiency since implementing Agent Forge.",
+    quote: "Implementing AI agents has never been easier. The enterprise features are exactly what we needed.",
     author: "Emily Thompson",
-    role: "Data Science Lead at DataTech",
-    avatar: "/testimonials/avatar3.svg"
+    title: "Engineering Lead, CloudScale",
+    avatar: "/avatars/avatar-3.jpg"
   }
 ]
 
 export function TestimonialsSection() {
   return (
-    <section className="py-24 bg-background">
+    <section className="py-20 bg-gray-50">
       <Container>
-        <div className="text-center space-y-4 mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold">
-            Trusted by Innovators
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            See what industry leaders are saying about Agent Forge
-          </p>
-        </div>
+        <h2 className="text-2xl font-bold text-center mb-12">
+          Trusted by Industry Leaders
+        </h2>
 
         <div className="grid md:grid-cols-3 gap-8">
           {testimonials.map((testimonial, index) => (
-            <div key={index} className="bg-card rounded-lg p-6 border">
-              <blockquote className="space-y-6">
-                <p className="text-muted-foreground">"{testimonial.quote}"</p>
-                <footer className="flex items-center gap-4">
-                  <div className="relative w-12 h-12 rounded-full overflow-hidden">
-                    <Image
-                      src={testimonial.avatar}
-                      alt={testimonial.author}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                  <div>
-                    <cite className="not-italic font-semibold">{testimonial.author}</cite>
-                    <p className="text-sm text-muted-foreground">{testimonial.role}</p>
-                  </div>
-                </footer>
+            <div
+              key={index}
+              className="bg-white p-6 rounded-lg border border-gray-200"
+            >
+              <div className="flex items-center mb-6">
+                <div className="relative w-12 h-12 rounded-full overflow-hidden mr-4">
+                  <Image
+                    src={testimonial.avatar}
+                    alt={testimonial.author}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+                <div>
+                  <h3 className="font-semibold">{testimonial.author}</h3>
+                  <p className="text-sm text-gray-600">{testimonial.title}</p>
+                </div>
+              </div>
+              <blockquote className="text-gray-700 italic">
+                "{testimonial.quote}"
               </blockquote>
             </div>
           ))}
