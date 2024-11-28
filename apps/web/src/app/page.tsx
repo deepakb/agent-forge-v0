@@ -7,7 +7,7 @@ import { ApplicationsSection } from '@/components/sections/applications'
 import { IntegrationsSection } from '@/components/sections/integrations'
 import { CaseStudiesSection } from '@/components/sections/case-studies'
 import { CTASection } from '@/components/sections/cta'
-import { GetStartedSection } from '@/components/sections/get-started'
+import { ResourcesSection } from '@/components/sections/resources'
 import { Footer } from '@/components/sections/footer'
 
 export default function Home() {
@@ -19,7 +19,7 @@ export default function Home() {
       <ApplicationsSection />
       <IntegrationsSection />
       <CaseStudiesSection />
-      <GetStartedSection />
+      <ResourcesSection />
       <CTASection />
       <Footer />
     </main>

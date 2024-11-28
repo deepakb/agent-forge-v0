@@ -222,85 +222,114 @@ export function ApplicationsSection() {
   const [selectedApp, setSelectedApp] = useState(null)
 
   return (
-    <section className="py-24 bg-gradient-to-b from-gray-50 to-white" id="solutions">
+    <section className="relative py-24 overflow-hidden bg-gradient-to-b from-gray-50 to-white" id="solutions">
+      {/* Background decoration */}
+      <div className="absolute inset-0 bg-grid-gray-100/50 bg-[size:20px_20px] [mask-image:linear-gradient(to_bottom,white,transparent,white)]" />
+      
       <Container>
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-800">
+          <div className="inline-flex items-center px-4 py-2 rounded-full bg-blue-50 text-blue-600 text-sm font-medium mb-4">
+            Enterprise Solutions
+          </div>
+          <h2 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">
             Production-Ready Solutions
           </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-lg text-gray-600 max-w-3xl mx-auto leading-relaxed">
             Enterprise-grade boilerplates with complete TypeScript implementations, security controls, 
             and deployment configurations. Start building production systems today.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
           {applications.map((app) => (
             <div
               key={app.title}
-              className="bg-white rounded-xl border border-gray-100 hover:border-blue-500/20 hover:shadow-xl transition-all duration-300 group cursor-pointer"
+              className="group bg-white rounded-xl border border-gray-100 hover:border-blue-500/20 hover:shadow-xl transition-all duration-300 cursor-pointer relative flex flex-col"
               onClick={() => setSelectedApp(app)}
             >
-              <div className="p-8">
+              {/* Hover gradient effect */}
+              <div className="absolute inset-0 bg-gradient-to-b from-blue-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+              
+              <div className="relative p-8 flex-1 flex flex-col">
                 <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-blue-500/5 rounded-xl flex items-center justify-center text-blue-500 group-hover:bg-blue-500/10 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-blue-500/5 rounded-xl flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
                       {app.icon}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-lg text-gray-900">{app.title}</h3>
-                      <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full mt-1 inline-block">
-                        {app.status}
+                      <h3 className="font-semibold text-lg text-gray-900 mb-2">{app.title}</h3>
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">
+                          {app.status}
+                        </div>
+                        <div className="text-lg font-bold text-gray-900">{app.price}</div>
                       </div>
                     </div>
                   </div>
-                  <div className="text-xl font-bold text-gray-900">{app.price}</div>
                 </div>
 
-                <p className="text-sm text-gray-600 mb-6 leading-relaxed">{app.description}</p>
+                <p className="text-sm text-gray-600 mb-6 leading-relaxed">{app.shortDescription}</p>
 
-                <div className="grid grid-cols-3 gap-4 mb-6 bg-gray-50/50 p-4 rounded-lg">
+                <div className="grid grid-cols-3 gap-4 mb-6 bg-gradient-to-br from-gray-50 to-gray-50/30 p-4 rounded-xl">
                   {Object.entries(app.metrics).map(([key, value]) => (
                     <div key={key} className="text-center">
-                      <div className="text-blue-600 font-semibold">{value}</div>
+                      <div className="text-blue-600 font-semibold bg-white px-2 py-1 rounded-lg shadow-sm mb-1">{value}</div>
                       <div className="text-xs text-gray-500 capitalize">{key}</div>
                     </div>
                   ))}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3 mb-6">
                   {app.features.slice(0, 3).map((feature) => (
                     <div key={feature} className="flex items-center text-sm text-gray-600">
-                      <svg className="w-4 h-4 mr-2 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-5 h-5 mr-3 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                       {feature}
                     </div>
                   ))}
                   {app.features.length > 3 && (
-                    <div className="text-sm text-blue-600 font-medium">
+                    <div className="text-sm text-blue-600 font-medium pl-8">
                       +{app.features.length - 3} more features
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="border-t border-gray-100 p-6 bg-gray-50/50">
+              <div className="relative border-t border-gray-100 p-6 bg-gradient-to-b from-gray-50/50 to-white rounded-b-xl mt-auto">
                 <div className="flex gap-4">
                   <Link
                     href={app.demoUrl}
-                    className="flex-1 text-center px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    className="flex-1 text-center px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
                   >
                     View Demo
                   </Link>
                   <Link
                     href={app.docsUrl}
-                    className="flex-1 text-center px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="flex-1 text-center px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
                   >
                     Documentation
                   </Link>
                 </div>
               </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Enterprise metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 p-8 bg-gradient-to-br from-blue-50 to-blue-50/30 rounded-2xl">
+          <div className="text-center md:text-left">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Enterprise Metrics</h3>
+            <p className="text-sm text-gray-600">Proven performance at scale</p>
+          </div>
+          {[
+            { label: 'Uptime SLA', value: '99.99%' },
+            { label: 'Response Time', value: '< 50ms' },
+            { label: 'Security Score', value: 'A+' }
+          ].map((metric) => (
+            <div key={metric.label} className="text-center">
+              <div className="text-3xl font-bold text-blue-600 mb-1">{metric.value}</div>
+              <div className="text-sm text-gray-600">{metric.label}</div>
             </div>
           ))}
         </div>
