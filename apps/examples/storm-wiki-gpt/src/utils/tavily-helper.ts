@@ -30,7 +30,7 @@ export class TavilyHelper {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'api-key': this.apiKey,
+          'Authorization': `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
           query,
@@ -44,37 +44,19 @@ export class TavilyHelper {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        if (response.status === 429) {
-          if (attempt <= this.maxRetries) {
-            this.logger.info('Rate limited by Tavily API, retrying...', {
-              attempt,
-              retryDelay: this.retryDelay,
-            });
-
-            await this.delay(this.retryDelay);
-            // Exponential backoff
-            this.retryDelay *= 2;
-            return this.searchWithRetry(query, attempt + 1);
-          }
-          const rateLimitError = new Error(`Rate limited by Tavily API after ${attempt} attempts`);
-          this.logger.error('Rate limit exceeded', rateLimitError);
-          throw rateLimitError;
-        }
-        const apiError = new Error(`Tavily API error: ${response.status} - ${errorData.message || response.statusText}`);
-        this.logger.error('API request failed', apiError);
-        throw apiError;
+        const error = new Error(`Tavily API error: ${response.status} - ${response.statusText}`);
+        this.logger.error('API request failed', error, {
+          statusCode: response.status,
+          statusText: response.statusText,
+          errorData,
+        });
+        throw error;
       }
 
       const data = await response.json();
-      
       if (!data.results || !Array.isArray(data.results)) {
-        const formatError = new Error('Invalid response format from Tavily API');
-        this.logger.error('Invalid API response', formatError);
-        throw formatError;
+        throw new Error('Invalid response format from Tavily API');
       }
-
-      // Reset retry delay on success
-      this.retryDelay = 1000;
 
       return data.results.map((result: any) => ({
         url: result.url,
@@ -83,48 +65,37 @@ export class TavilyHelper {
         score: result.relevance_score || 0,
       }));
     } catch (error) {
-      const wrappedError = error instanceof Error ? error : new Error('Unknown error during Tavily search');
-      
-      // Re-throw rate limit errors to be handled by the retry mechanism
-      if (wrappedError.message.toLowerCase().includes('rate limit')) {
-        throw wrappedError;
+      if (error instanceof Error) {
+        if (attempt <= this.maxRetries) {
+          const nextDelay = this.retryDelay * Math.pow(2, attempt - 1);
+          this.logger.info('Retrying Tavily API request...', {
+            attempt,
+            nextDelay,
+            errorMessage: error.message,
+          });
+          await this.delay(nextDelay);
+          return this.searchWithRetry(query, attempt + 1);
+        }
       }
-
-      this.logger.error('Failed to execute Tavily search', wrappedError);
-      throw wrappedError;
+      throw error;
     }
   }
 
   public async search(query: string): Promise<SearchResult[]> {
     try {
-      const startTime = this.logger.startOperation('tavily_search', {
-        query,
-      });
-
-      this.logger.info('Starting Tavily search', {
-        query,
-      });
-
+      this.logger.info('Starting Tavily search', { query });
       const results = await this.searchWithRetry(query);
-
-      this.logger.info('Tavily search successful', {
+      this.logger.info('Tavily search completed', {
         query,
         resultCount: results.length,
       });
-
-      this.logger.endOperation('tavily_search', startTime, {
-        query,
-        resultCount: results.length,
-      });
-
       return results;
     } catch (error) {
-      const wrappedError = error instanceof Error ? error : new Error('Unknown error during Tavily search');
-      this.logger.error('Tavily search failed', wrappedError, {
+      const errorObj = error instanceof Error ? error : new Error('Unknown error');
+      this.logger.error('Tavily search failed', errorObj, {
         query,
-        errorMessage: wrappedError.message,
       });
-      throw wrappedError;
+      throw errorObj;
     }
   }
 }

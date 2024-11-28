@@ -12,6 +12,24 @@ export class QueryAgent extends BaseAgent {
     this.fetchAgentId = config.fetchAgentId;
   }
 
+  private extractJSONArray(text: string): string[] {
+    try {
+      // First try direct JSON parse
+      return JSON.parse(text);
+    } catch (e) {
+      // Try to find JSON array in text
+      const match = text.match(/\[[\s\S]*\]/);
+      if (match) {
+        try {
+          return JSON.parse(match[0]);
+        } catch (e) {
+          throw new Error('Failed to parse JSON array from response');
+        }
+      }
+      throw new Error('No JSON array found in response');
+    }
+  }
+
   public async handleMessage(message: AgentMessage): Promise<TaskResult> {
     try {
       if (message.type !== MessageType.TOPIC) {
@@ -24,24 +42,45 @@ export class QueryAgent extends BaseAgent {
         topic,
       });
 
-      const prompt = `Generate 3-5 specific search queries to gather comprehensive information about "${topic}" for writing a Wikipedia-style article. Each query should focus on different aspects of the topic. Format the response as a JSON array of strings.`;
+      const prompt = `Generate 3-5 specific search queries to gather comprehensive information about "${topic}" for writing a Wikipedia-style article. Each query should focus on different aspects of the topic.
+
+Requirements:
+1. Return ONLY a JSON array of strings
+2. Each string should be a complete search query
+3. Do not include any other text or explanation
+
+Example response format:
+["query 1", "query 2", "query 3"]`;
 
       const response = await this.openai.complete(prompt);
       let queries: string[];
       
       try {
-        queries = JSON.parse(response);
+        queries = this.extractJSONArray(response);
         if (!Array.isArray(queries)) {
           throw new Error('Response is not an array');
         }
+        
+        // Clean and validate queries
+        queries = queries
+          .filter(query => typeof query === 'string' && query.trim().length > 0)
+          .map(query => query.trim());
+          
+        if (queries.length === 0) {
+          throw new Error('No valid queries found in response');
+        }
       } catch (error) {
-        this.logger.error('Failed to parse OpenAI response', error instanceof Error ? error : new Error('Unknown error'));
+        const errorObj = error instanceof Error ? error : new Error('Unknown error');
+        this.logger.error('Failed to parse OpenAI response', errorObj, {
+          response,
+        });
         queries = [topic]; // Fallback to using the topic as a query
       }
 
       this.logger.info('Generated search queries', {
         agentId: this.getId(),
         queryCount: queries.length,
+        queries, // Log queries for debugging
       });
 
       const nextMessage: AgentMessage = {
@@ -58,10 +97,11 @@ export class QueryAgent extends BaseAgent {
         message: nextMessage,
       };
     } catch (error) {
-      this.logger.error('Query agent failed', error instanceof Error ? error : new Error('Unknown error'));
+      const errorObj = error instanceof Error ? error : new Error('Unknown error');
+      this.logger.error('Query agent failed', errorObj);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: errorObj.message,
       };
     }
   }

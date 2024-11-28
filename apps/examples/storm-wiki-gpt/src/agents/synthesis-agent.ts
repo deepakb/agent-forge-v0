@@ -14,6 +14,13 @@ export class SynthesisAgent extends BaseAgent {
     this.completionEmitter = new EventEmitter();
   }
 
+  private generateTableOfContents(sections: string[]): string {
+    return `
+## Contents
+${sections.map((section, index) => `${index + 1}. [${section}](#${section.toLowerCase().replace(/\s+/g, '-')})`).join('\n')}
+`;
+  }
+
   public async handleMessage(message: AgentMessage): Promise<TaskResult> {
     try {
       if (message.type !== MessageType.SEARCH_RESULTS) {
@@ -26,26 +33,57 @@ export class SynthesisAgent extends BaseAgent {
         resultCount: searchResults.length,
       });
 
-      // Prepare content for synthesis
+      // Prepare content for synthesis with source tracking
       const contentForSynthesis = searchResults
-        .map(result => `Title: ${result.title}\nContent: ${result.content}`)
+        .map((result, index) => `[Source ${index + 1}]
+Title: ${result.title}
+URL: ${result.url}
+Content: ${result.content}`)
         .join('\n\n');
 
-      const prompt = `Using the following search results, write a comprehensive Wikipedia-style article. The article should be well-organized, factual, and objective. Include relevant sections with appropriate headings.
+      const prompt = `You are tasked with writing a comprehensive Wikipedia-style article based on the provided search results. Follow these requirements carefully:
 
-Search Results:
+1. Structure:
+   - Start with a brief lead section (no heading) that summarizes the topic
+   - Include a table of contents
+   - Organize content into logical sections with proper headings (use ## for main sections)
+   - Use subsections where appropriate (use ### for subsections)
+
+2. Content Guidelines:
+   - Write in an encyclopedic, neutral tone
+   - Focus on factual information
+   - Include relevant technical details
+   - Maintain objectivity
+   - Use formal language
+
+3. Citations:
+   - Add citations using [1], [2], etc.
+   - Include a References section at the end
+   - Link citations to the provided source URLs
+   - Add citations after key facts and claims
+
+4. Formatting:
+   - Use Markdown formatting
+   - Use bullet points or numbered lists where appropriate
+   - Include relevant section headings like:
+     * Overview/Introduction
+     * History
+     * Technical details/Technology
+     * Applications/Uses
+     * Impact/Significance
+     * Future developments
+     * See also
+     * References
+
+5. Special Elements:
+   - Add a "See also" section with related topics
+   - Include any relevant notes or external links
+
+Here are the search results to use as sources:
+
 ${contentForSynthesis}
 
-Requirements:
-1. Write in an encyclopedic style
-2. Use clear section headings
-3. Present information objectively
-4. Maintain a formal tone
-5. Focus on factual accuracy
-6. Include relevant technical details
-7. Organize content logically
-
-Write the article now:`;
+Write the article now, ensuring proper citation of sources and Wikipedia-style formatting.`;
 
       const article = await this.openai.complete(prompt);
 
@@ -64,7 +102,10 @@ Write the article now:`;
       await this.publishMessage(nextMessage);
 
       // Emit completion event
-      this.completionEmitter.emit('synthesisComplete', { content: article, sources: searchResults.map(result => result.url) });
+      this.completionEmitter.emit('synthesisComplete', { 
+        content: article, 
+        sources: searchResults.map(result => result.url) 
+      });
 
       return {
         success: true,
