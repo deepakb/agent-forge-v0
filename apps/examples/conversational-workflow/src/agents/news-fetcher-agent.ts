@@ -42,19 +42,19 @@ export class NewsFetcherAgent extends BaseAgent<NewsFetcherAgentState> {
     'theverge.com',
     'cnn.com',
     'nytimes.com',
-    'wsj.com'
+    'wsj.com',
   ];
 
   constructor(config: AgentConfig) {
     super({
       id: config.id,
-      type: 'newsFetcher'
+      type: 'newsFetcher',
     });
 
     console.log(`NewsFetcherAgent: Initializing with config:`, {
       id: config.id,
       type: 'newsFetcher',
-      hasTavilyKey: !!config.apiKeys.tavily
+      hasTavilyKey: !!config.apiKeys.tavily,
     });
 
     if (!config.apiKeys.tavily) {
@@ -62,7 +62,7 @@ export class NewsFetcherAgent extends BaseAgent<NewsFetcherAgentState> {
     }
 
     this.tavily = {
-      apiKey: config.apiKeys.tavily
+      apiKey: config.apiKeys.tavily,
     };
 
     console.log(`NewsFetcherAgent initialized with ID: ${this.id}`);
@@ -70,9 +70,9 @@ export class NewsFetcherAgent extends BaseAgent<NewsFetcherAgentState> {
 
   public async processMessage(message: Message): Promise<void> {
     try {
-      this.updateState({ 
-        status: 'processing', 
-        lastMessage: message
+      this.updateState({
+        status: 'processing',
+        lastMessage: message,
       });
 
       switch (message.type) {
@@ -101,12 +101,12 @@ export class NewsFetcherAgent extends BaseAgent<NewsFetcherAgentState> {
 
     try {
       console.log(`NewsFetcherAgent (${this.id}): Processing query: "${message.content}"`);
-      
-      this.updateState({ 
+
+      this.updateState({
         status: 'fetching',
         lastQuery: message.content,
         articles: undefined,
-        lastError: undefined
+        lastError: undefined,
       });
 
       const response = await this.makeRequest(message.content);
@@ -119,13 +119,13 @@ export class NewsFetcherAgent extends BaseAgent<NewsFetcherAgentState> {
       const articles = response.data.results.map(result => ({
         content: result.content,
         source: result.source || result.url,
-        relevance: result.relevance_score || 0
+        relevance: result.relevance_score || 0,
       }));
 
-      this.updateState({ 
+      this.updateState({
         status: 'success',
         articles,
-        lastError: undefined
+        lastError: undefined,
       });
 
       console.log(`NewsFetcherAgent (${this.id}): Found ${articles.length} articles`);
@@ -135,17 +135,16 @@ export class NewsFetcherAgent extends BaseAgent<NewsFetcherAgentState> {
         content: {
           articles,
           query: message.content,
-          total: articles.length
+          total: articles.length,
         },
         metadata: {
           ...message.metadata,
           source: this.id,
           target: 'chatbot',
           requiresSummarization: true,
-          timestamp: Date.now()
-        }
+          timestamp: Date.now(),
+        },
       });
-
     } catch (error) {
       this.handleApiError(error);
     }
@@ -158,28 +157,29 @@ export class NewsFetcherAgent extends BaseAgent<NewsFetcherAgentState> {
         this.baseUrl,
         {
           query,
-          search_depth: "advanced",
+          search_depth: 'advanced',
           include_answer: false,
           include_raw_content: false,
-          include_domains: this.includeDomains
+          include_domains: this.includeDomains,
         },
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.tavily.apiKey}`
+            Authorization: `Bearer ${this.tavily.apiKey}`,
           },
-          timeout: 15000 // 15 second timeout
+          timeout: 15000, // 15 second timeout
         }
       );
 
       const duration = Date.now() - startTime;
       console.log(`NewsFetcherAgent (${this.id}): Request completed in ${duration}ms`);
       return response;
-
     } catch (error) {
       if (retryCount < this.maxRetries) {
         const backoffMs = Math.min(1000 * Math.pow(2, retryCount), 5000);
-        console.log(`NewsFetcherAgent (${this.id}): Retrying request (${retryCount + 1}/${this.maxRetries}) after ${backoffMs}ms`);
+        console.log(
+          `NewsFetcherAgent (${this.id}): Retrying request (${retryCount + 1}/${this.maxRetries}) after ${backoffMs}ms`
+        );
         await new Promise(resolve => setTimeout(resolve, backoffMs));
         return this.makeRequest(query, retryCount + 1);
       }
@@ -212,8 +212,8 @@ export class NewsFetcherAgent extends BaseAgent<NewsFetcherAgentState> {
       lastError: {
         code: errorCode,
         message: errorMessage,
-        timestamp: Date.now()
-      }
+        timestamp: Date.now(),
+      },
     });
 
     console.error(`NewsFetcherAgent (${this.id}): ${errorMessage}`);

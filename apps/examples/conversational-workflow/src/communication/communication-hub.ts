@@ -12,7 +12,7 @@ export class CommunicationHub extends EventEmitter {
       ['chatbot', 'chatbot'],
       ['news', 'newsFetcher'],
       ['knowledge', 'knowledge'],
-      ['summarization', 'summarization']
+      ['summarization', 'summarization'],
     ]);
   }
 
@@ -76,9 +76,7 @@ export class CommunicationHub extends EventEmitter {
         throw new Error(`Unknown target type: ${message.metadata.target}`);
       }
 
-      const targetAgent = Array.from(this.agents.values()).find(
-        agent => agent.type === targetType
-      );
+      const targetAgent = Array.from(this.agents.values()).find(agent => agent.type === targetType);
 
       if (!targetAgent) {
         throw new Error(`Target agent ${message.metadata.target} (${targetType}) not found`);
@@ -91,9 +89,9 @@ export class CommunicationHub extends EventEmitter {
       this.emit('error', error);
       // Emit workflow error if we have a workflow ID
       if (message.metadata.workflowId) {
-        this.emit('workflow_error', { 
+        this.emit('workflow_error', {
           workflowId: message.metadata.workflowId,
-          error: error instanceof Error ? error : new Error(String(error))
+          error: error instanceof Error ? error : new Error(String(error)),
         });
       }
     }

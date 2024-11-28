@@ -5,7 +5,7 @@ import { config } from './config/config';
 // Debug logging for environment variables
 console.log('Environment variables loaded:', {
   hasOpenAIKey: !!process.env.OPENAI_API_KEY,
-  hasTavilyKey: !!process.env.TAVILY_API_KEY
+  hasTavilyKey: !!process.env.TAVILY_API_KEY,
 });
 
 interface WorkflowMetrics {
@@ -38,7 +38,7 @@ class WorkflowRunner {
 
     // Set up workflow event handlers
     this.setupEventHandlers();
-    
+
     // Set up process signal handlers
     this.setupSignalHandlers();
   }
@@ -67,7 +67,10 @@ class WorkflowRunner {
     });
     process.on('unhandledRejection', (error: unknown) => {
       console.error('Unhandled rejection:', error);
-      this.handleShutdown('unhandledRejection', error instanceof Error ? error : new Error(String(error)));
+      this.handleShutdown(
+        'unhandledRejection',
+        error instanceof Error ? error : new Error(String(error))
+      );
     });
   }
 
@@ -76,7 +79,7 @@ class WorkflowRunner {
     this.isShuttingDown = true;
 
     console.log(`\nReceived ${signal}. Initiating graceful shutdown...`);
-    
+
     try {
       // Complete any active workflows with error status
       for (const [workflowId, metrics] of this.activeWorkflows.entries()) {
@@ -93,7 +96,11 @@ class WorkflowRunner {
     }
   }
 
-  private completeWorkflow(workflowId: string, status: 'success' | 'error' | 'timeout', error?: Error): void {
+  private completeWorkflow(
+    workflowId: string,
+    status: 'success' | 'error' | 'timeout',
+    error?: Error
+  ): void {
     const metrics = this.activeWorkflows.get(workflowId);
     if (metrics) {
       metrics.endTime = Date.now();
@@ -103,7 +110,7 @@ class WorkflowRunner {
 
       console.log(`Workflow ${workflowId} ${status}:`, {
         duration: `${metrics.duration}ms`,
-        ...(error && { error: error.message })
+        ...(error && { error: error.message }),
       });
 
       this.activeWorkflows.delete(workflowId);
@@ -128,7 +135,7 @@ class WorkflowRunner {
     const backoffTime = Math.min(1000 * Math.pow(2, retries), 30000); // Max 30 second delay
     console.log(`Rate limit hit. Retrying in ${backoffTime}ms...`);
     await new Promise(resolve => setTimeout(resolve, backoffTime));
-    
+
     this.retryCount.set(workflowId, retries + 1);
     return true;
   }
@@ -152,7 +159,7 @@ class WorkflowRunner {
     // Track workflow metrics
     this.activeWorkflows.set(workflowId, {
       startTime,
-      status: 'success'
+      status: 'success',
     });
 
     // Set up timeout
@@ -166,9 +173,12 @@ class WorkflowRunner {
       await this.workflowManager.processQuery(query);
     } catch (error) {
       const errorObj = error instanceof Error ? error : new Error(String(error));
-      
+
       // Handle rate limits
-      if (errorObj.message.toLowerCase().includes('rate limit') && await this.handleRateLimit(workflowId)) {
+      if (
+        errorObj.message.toLowerCase().includes('rate limit') &&
+        (await this.handleRateLimit(workflowId))
+      ) {
         return this.processQuery(query); // Retry the query
       }
 
@@ -179,9 +189,9 @@ class WorkflowRunner {
 
   public async run(): Promise<void> {
     const queries = [
-      "What are the key developments in AI safety and regulation in 2024?",
-      "What are the latest advancements in renewable energy storage technology?",
-      "What are the major cybersecurity threats affecting cloud computing?"
+      'What are the key developments in AI safety and regulation in 2024?',
+      'What are the latest advancements in renewable energy storage technology?',
+      'What are the major cybersecurity threats affecting cloud computing?',
     ];
 
     console.log('Starting workflow processing...\n');
@@ -192,7 +202,7 @@ class WorkflowRunner {
 
       try {
         await this.processQuery(query);
-        
+
         // Add delay between queries based on concurrent tasks setting
         if (queries.indexOf(query) < queries.length - 1) {
           const delayMs = Math.max(5000 / this.concurrentTasks, 1000); // Minimum 1 second delay

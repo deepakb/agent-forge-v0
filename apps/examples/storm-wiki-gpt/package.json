@@ -6,7 +6,10 @@
     "start": "ts-node src/index.ts",
     "build": "tsc",
     "dev": "ts-node-dev --respawn src/index.ts",
-    "lint": "eslint src --ext .ts",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,md,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,md,json}\"",
     "test": "jest"
   },
   "dependencies": {

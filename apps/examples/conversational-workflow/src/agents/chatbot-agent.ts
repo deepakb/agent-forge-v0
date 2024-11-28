@@ -10,13 +10,13 @@ export class ChatbotAgent extends BaseAgent<ChatbotAgentState> {
   constructor(config: AgentConfig) {
     super({
       id: config.id,
-      type: 'chatbot'
+      type: 'chatbot',
     });
-    
+
     this.updateState({
       status: 'idle',
       pendingResponses: new Set(),
-      completedResponses: new Set()
+      completedResponses: new Set(),
     });
 
     console.log(`ChatbotAgent initialized with ID: ${this.id}`);
@@ -24,9 +24,9 @@ export class ChatbotAgent extends BaseAgent<ChatbotAgentState> {
 
   public async processMessage(message: Message): Promise<void> {
     try {
-      this.updateState({ 
+      this.updateState({
         status: 'processing',
-        lastMessage: message
+        lastMessage: message,
       });
 
       switch (message.type) {
@@ -65,8 +65,8 @@ export class ChatbotAgent extends BaseAgent<ChatbotAgentState> {
         ...message.metadata,
         source: this.id,
         target: 'knowledge',
-        timestamp: Date.now()
-      }
+        timestamp: Date.now(),
+      },
     });
 
     // Emit a news search request
@@ -77,8 +77,8 @@ export class ChatbotAgent extends BaseAgent<ChatbotAgentState> {
         ...message.metadata,
         source: this.id,
         target: 'news',
-        timestamp: Date.now()
-      }
+        timestamp: Date.now(),
+      },
     });
 
     console.log(`ChatbotAgent (${this.id}): Sent query to knowledge and news agents`);
@@ -90,7 +90,7 @@ export class ChatbotAgent extends BaseAgent<ChatbotAgentState> {
     // Update response tracking
     const { pendingResponses = new Set(), completedResponses = new Set() } = this.state;
     const sourceAgent = message.metadata.source.split('-')[0]; // Extract base agent type
-    
+
     pendingResponses.delete(sourceAgent);
     completedResponses.add(sourceAgent);
 
@@ -105,8 +105,8 @@ export class ChatbotAgent extends BaseAgent<ChatbotAgentState> {
           ...message.metadata,
           source: this.id,
           target: 'summarization',
-          timestamp: Date.now()
-        }
+          timestamp: Date.now(),
+        },
       });
     }
 

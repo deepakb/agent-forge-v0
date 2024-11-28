@@ -18,7 +18,7 @@ export class SummarizationAgent extends BaseAgent<SummarizationAgentState> {
   constructor(config: AgentConfig) {
     super({
       id: config.id,
-      type: 'summarization'
+      type: 'summarization',
     });
 
     if (!config.apiKeys.openai) {
@@ -26,7 +26,7 @@ export class SummarizationAgent extends BaseAgent<SummarizationAgentState> {
     }
 
     this.openai = new OpenAI({
-      apiKey: config.apiKeys.openai
+      apiKey: config.apiKeys.openai,
     });
 
     console.log(`SummarizationAgent initialized with ID: ${this.id}`);
@@ -34,9 +34,9 @@ export class SummarizationAgent extends BaseAgent<SummarizationAgentState> {
 
   public async processMessage(message: Message): Promise<void> {
     try {
-      this.updateState({ 
+      this.updateState({
         status: 'processing',
-        lastMessage: message
+        lastMessage: message,
       });
 
       switch (message.type) {
@@ -66,20 +66,20 @@ export class SummarizationAgent extends BaseAgent<SummarizationAgentState> {
   private async handleSummarization(message: Message): Promise<void> {
     try {
       console.log(`SummarizationAgent (${this.id}): Processing summarization request`);
-      
-      this.updateState({ 
+
+      this.updateState({
         status: 'processing',
         lastInput: message.content,
         summary: undefined,
-        lastError: undefined
+        lastError: undefined,
       });
 
       const summary = await this.generateSummary(message.content);
-      
-      this.updateState({ 
+
+      this.updateState({
         status: 'success',
         summary,
-        lastError: undefined
+        lastError: undefined,
       });
 
       await this.sendMessage({
@@ -90,10 +90,9 @@ export class SummarizationAgent extends BaseAgent<SummarizationAgentState> {
           source: this.id,
           target: 'chatbot',
           requiresSummarization: false, // Mark as not requiring further summarization
-          timestamp: Date.now()
-        }
+          timestamp: Date.now(),
+        },
       });
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`Error in summarization (${this.id}):`, errorMessage);
@@ -102,8 +101,8 @@ export class SummarizationAgent extends BaseAgent<SummarizationAgentState> {
         lastError: {
           code: 'SUMMARIZATION_ERROR',
           message: errorMessage,
-          timestamp: Date.now()
-        }
+          timestamp: Date.now(),
+        },
       });
       throw error;
     }
@@ -118,14 +117,18 @@ export class SummarizationAgent extends BaseAgent<SummarizationAgentState> {
         inputText = content;
       } else if (content.results && Array.isArray(content.results)) {
         // Handle knowledge agent results
-        inputText = content.results.map((r: { source: string; content: string }) => 
-          `Source: ${r.source}\nContent: ${r.content}`
-        ).join('\n\n');
+        inputText = content.results
+          .map(
+            (r: { source: string; content: string }) => `Source: ${r.source}\nContent: ${r.content}`
+          )
+          .join('\n\n');
       } else if (content.articles && Array.isArray(content.articles)) {
         // Handle news fetcher results
-        inputText = content.articles.map((a: { source: string; content: string }) => 
-          `Source: ${a.source}\nContent: ${a.content}`
-        ).join('\n\n');
+        inputText = content.articles
+          .map(
+            (a: { source: string; content: string }) => `Source: ${a.source}\nContent: ${a.content}`
+          )
+          .join('\n\n');
       } else {
         inputText = JSON.stringify(content, null, 2);
       }
@@ -133,19 +136,20 @@ export class SummarizationAgent extends BaseAgent<SummarizationAgentState> {
       const prompt = `Please provide a clear and concise summary of the following information:\n\n${inputText}\n\nSummary:`;
 
       const response = await this.openai.chat.completions.create({
-        model: "gpt-4",
+        model: 'gpt-4',
         messages: [
           {
-            role: "system",
-            content: "You are a helpful AI assistant that creates clear, accurate, and concise summaries of information."
+            role: 'system',
+            content:
+              'You are a helpful AI assistant that creates clear, accurate, and concise summaries of information.',
           },
           {
-            role: "user",
-            content: prompt
-          }
+            role: 'user',
+            content: prompt,
+          },
         ],
         temperature: 0.7,
-        max_tokens: 500
+        max_tokens: 500,
       });
 
       return response.choices[0]?.message?.content || 'No summary generated';

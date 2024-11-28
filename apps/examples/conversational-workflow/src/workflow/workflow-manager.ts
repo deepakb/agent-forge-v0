@@ -34,7 +34,7 @@ export class WorkflowManager extends EventEmitter {
     console.log('Initializing WorkflowManager with config:', {
       timeoutMs: this.workflowTimeoutMs,
       maxRetries: this.maxRetries,
-      concurrentTasks: config.workflowDefaults.concurrentTasks
+      concurrentTasks: config.workflowDefaults.concurrentTasks,
     });
 
     // Initialize agents with their configurations
@@ -45,12 +45,12 @@ export class WorkflowManager extends EventEmitter {
         this.communicationHub.registerAgent(agent);
 
         // Forward agent state changes
-        agent.on('state_change', (state) => {
+        agent.on('state_change', state => {
           this.handleAgentStateChange(agent.id, state);
         });
 
         // Forward agent errors
-        agent.on('error', (error) => {
+        agent.on('error', error => {
           this.handleAgentError(agent.id, error);
         });
       }
@@ -159,9 +159,7 @@ export class WorkflowManager extends EventEmitter {
         startTime: Date.now(),
         query,
         status: 'active',
-        agentStates: new Map(
-          Array.from(this.agents.values()).map(agent => [agent.id, null])
-        )
+        agentStates: new Map(Array.from(this.agents.values()).map(agent => [agent.id, null])),
       };
 
       this.activeWorkflows.set(workflowId, context);
@@ -181,7 +179,7 @@ export class WorkflowManager extends EventEmitter {
           resolve();
         });
 
-        this.once(`workflow_error_${workflowId}`, (error) => {
+        this.once(`workflow_error_${workflowId}`, error => {
           clearTimeout(timeout);
           this.handleWorkflowError(workflowId, error);
           reject(error);
@@ -196,13 +194,12 @@ export class WorkflowManager extends EventEmitter {
           workflowId,
           timestamp: Date.now(),
           source: 'user',
-          target: 'chatbot'
-        }
+          target: 'chatbot',
+        },
       });
 
       // Wait for workflow completion or timeout
       await workflowComplete;
-
     } catch (error) {
       console.error('Error processing query:', error);
       this.emit('error', error);
@@ -215,46 +212,49 @@ export class WorkflowManager extends EventEmitter {
       const activeWorkflowCount = this.activeWorkflows.size;
       if (activeWorkflowCount > 0) {
         console.log(`Waiting for ${activeWorkflowCount} active workflows to complete...`);
-        
+
         // Give workflows a chance to complete gracefully
         await Promise.race([
           Promise.all(
             Array.from(this.activeWorkflows.keys()).map(
-              workflowId => new Promise<void>(resolve => {
-                this.once(`workflow_complete_${workflowId}`, resolve);
-                this.once(`workflow_error_${workflowId}`, resolve);
-              })
+              workflowId =>
+                new Promise<void>(resolve => {
+                  this.once(`workflow_complete_${workflowId}`, resolve);
+                  this.once(`workflow_error_${workflowId}`, resolve);
+                })
             )
           ),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Shutdown timeout waiting for workflows')), 10000)
-          )
+          ),
         ]);
       }
 
       console.log('Shutting down agents...');
-      
+
       // Notify all agents to perform cleanup
-      const shutdownPromises = Array.from(this.agents.values()).map(agent => 
-        agent.processMessage({
-          type: 'system',
-          content: 'shutdown',
-          metadata: {
-            timestamp: Date.now(),
-            source: 'system',
-            target: agent.type
-          }
-        }).catch(error => {
-          console.error(`Error shutting down agent ${agent.id}:`, error);
-        })
+      const shutdownPromises = Array.from(this.agents.values()).map(agent =>
+        agent
+          .processMessage({
+            type: 'system',
+            content: 'shutdown',
+            metadata: {
+              timestamp: Date.now(),
+              source: 'system',
+              target: agent.type,
+            },
+          })
+          .catch(error => {
+            console.error(`Error shutting down agent ${agent.id}:`, error);
+          })
       );
 
       // Wait for all agents to cleanup with a timeout
       await Promise.race([
         Promise.all(shutdownPromises),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Shutdown timeout waiting for agents')), 5000)
-        )
+        ),
       ]);
 
       // Clean up resources
@@ -264,7 +264,6 @@ export class WorkflowManager extends EventEmitter {
       this.agents.clear();
       this.activeWorkflows.clear();
       console.log('Workflow manager shutdown complete');
-
     } catch (error) {
       console.error('Error during shutdown:', error);
       this.emit('error', error);

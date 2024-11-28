@@ -10,19 +10,23 @@ export class TavilyAPI {
 
   public async searchNews(query: string): Promise<any[]> {
     try {
-      const response = await axios.post(`${this.baseUrl}/search`, {
-        query,
-        search_depth: 'advanced',
-        include_domains: ['news.google.com', 'reuters.com', 'bloomberg.com', 'cnbc.com'],
-        include_answer: false,
-        include_images: false,
-        max_results: 5
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': this.apiKey
+      const response = await axios.post(
+        `${this.baseUrl}/search`,
+        {
+          query,
+          search_depth: 'advanced',
+          include_domains: ['news.google.com', 'reuters.com', 'bloomberg.com', 'cnbc.com'],
+          include_answer: false,
+          include_images: false,
+          max_results: 5,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': this.apiKey,
+          },
         }
-      });
+      );
 
       return response.data.results || [];
     } catch (error) {
@@ -33,18 +37,22 @@ export class TavilyAPI {
 
   public async searchKnowledge(query: string): Promise<any[]> {
     try {
-      const response = await axios.post(`${this.baseUrl}/search`, {
-        query,
-        search_depth: 'advanced',
-        include_answer: true,
-        include_images: false,
-        max_results: 5
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': this.apiKey
+      const response = await axios.post(
+        `${this.baseUrl}/search`,
+        {
+          query,
+          search_depth: 'advanced',
+          include_answer: true,
+          include_images: false,
+          max_results: 5,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': this.apiKey,
+          },
         }
-      });
+      );
 
       return response.data.results || [];
     } catch (error) {

@@ -36,14 +36,14 @@ export class KnowledgeAgent extends BaseAgent<KnowledgeAgentState> {
   constructor(config: AgentConfig) {
     super({
       id: config.id,
-      type: 'knowledge'
+      type: 'knowledge',
     });
 
     console.log(`KnowledgeAgent: Initializing with config:`, {
       id: config.id,
       type: 'knowledge',
       hasTavilyKey: !!config.apiKeys.tavily,
-      hasOpenAIKey: !!config.apiKeys.openai
+      hasOpenAIKey: !!config.apiKeys.openai,
     });
 
     if (!config.apiKeys.tavily) {
@@ -51,7 +51,7 @@ export class KnowledgeAgent extends BaseAgent<KnowledgeAgentState> {
     }
 
     this.tavily = {
-      apiKey: config.apiKeys.tavily
+      apiKey: config.apiKeys.tavily,
     };
 
     console.log(`KnowledgeAgent initialized with ID: ${this.id}`);
@@ -59,9 +59,9 @@ export class KnowledgeAgent extends BaseAgent<KnowledgeAgentState> {
 
   public async processMessage(message: Message): Promise<void> {
     try {
-      this.updateState({ 
+      this.updateState({
         status: 'processing',
-        lastMessage: message
+        lastMessage: message,
       });
 
       switch (message.type) {
@@ -86,12 +86,12 @@ export class KnowledgeAgent extends BaseAgent<KnowledgeAgentState> {
   private async handleQuery(message: Message): Promise<void> {
     try {
       console.log(`KnowledgeAgent (${this.id}): Processing query: "${message.content}"`);
-      
-      this.updateState({ 
+
+      this.updateState({
         status: 'fetching',
         lastQuery: message.content,
         results: undefined,
-        lastError: undefined
+        lastError: undefined,
       });
 
       const response = await this.makeRequest(message.content);
@@ -104,13 +104,13 @@ export class KnowledgeAgent extends BaseAgent<KnowledgeAgentState> {
       const results = response.data.results.map(result => ({
         content: result.content,
         source: result.source || result.url,
-        relevance: result.relevance_score || 0
+        relevance: result.relevance_score || 0,
       }));
 
-      this.updateState({ 
+      this.updateState({
         status: 'success',
         results,
-        lastError: undefined
+        lastError: undefined,
       });
 
       console.log(`KnowledgeAgent (${this.id}): Found ${results.length} results`);
@@ -120,17 +120,16 @@ export class KnowledgeAgent extends BaseAgent<KnowledgeAgentState> {
         content: {
           results,
           query: message.content,
-          total: results.length
+          total: results.length,
         },
         metadata: {
           ...message.metadata,
           source: this.id,
           target: 'chatbot',
           requiresSummarization: true,
-          timestamp: Date.now()
-        }
+          timestamp: Date.now(),
+        },
       });
-
     } catch (error) {
       this.handleApiError(error);
     }
@@ -143,28 +142,29 @@ export class KnowledgeAgent extends BaseAgent<KnowledgeAgentState> {
         this.baseUrl,
         {
           query,
-          search_depth: "advanced",
+          search_depth: 'advanced',
           include_answer: false,
           include_raw_content: false,
-          include_domains: ['*']
+          include_domains: ['*'],
         },
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.tavily.apiKey}`
+            Authorization: `Bearer ${this.tavily.apiKey}`,
           },
-          timeout: 15000 // 15 second timeout
+          timeout: 15000, // 15 second timeout
         }
       );
 
       const duration = Date.now() - startTime;
       console.log(`KnowledgeAgent (${this.id}): Request completed in ${duration}ms`);
       return response;
-
     } catch (error) {
       if (retryCount < this.maxRetries) {
         const backoffMs = Math.min(1000 * Math.pow(2, retryCount), 5000);
-        console.log(`KnowledgeAgent (${this.id}): Retrying request (${retryCount + 1}/${this.maxRetries}) after ${backoffMs}ms`);
+        console.log(
+          `KnowledgeAgent (${this.id}): Retrying request (${retryCount + 1}/${this.maxRetries}) after ${backoffMs}ms`
+        );
         await new Promise(resolve => setTimeout(resolve, backoffMs));
         return this.makeRequest(query, retryCount + 1);
       }
@@ -188,8 +188,8 @@ export class KnowledgeAgent extends BaseAgent<KnowledgeAgentState> {
       lastError: {
         code: errorCode,
         message: errorMessage,
-        timestamp: Date.now()
-      }
+        timestamp: Date.now(),
+      },
     });
 
     throw new Error(errorMessage);

@@ -7,6 +7,10 @@
     "build": "tsc",
     "start": "node dist/example.js",
     "dev": "ts-node src/example.ts",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,md,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,md,json}\"",
     "test": "jest"
   },
   "dependencies": {

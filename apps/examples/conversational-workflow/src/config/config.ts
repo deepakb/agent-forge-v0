@@ -42,8 +42,8 @@ export const config: Config = {
       type: 'chatbot',
       capabilities: ['query_parsing', 'conversation_management'],
       apiKeys: {
-        openai: process.env.OPENAI_API_KEY
-      }
+        openai: process.env.OPENAI_API_KEY,
+      },
     },
     knowledge: {
       id: 'knowledge-agent',
@@ -51,46 +51,46 @@ export const config: Config = {
       capabilities: ['knowledge_retrieval', 'fact_checking'],
       apiKeys: {
         openai: process.env.OPENAI_API_KEY,
-        tavily: process.env.TAVILY_API_KEY
-      }
+        tavily: process.env.TAVILY_API_KEY,
+      },
     },
     newsFetcher: {
       id: 'news-fetcher-agent',
       type: 'newsFetcher',
       capabilities: ['news_search'],
       apiKeys: {
-        tavily: process.env.TAVILY_API_KEY
-      }
+        tavily: process.env.TAVILY_API_KEY,
+      },
     },
     summarization: {
       id: 'summarization-agent',
       type: 'summarization',
       capabilities: ['content_summarization'],
       apiKeys: {
-        openai: process.env.OPENAI_API_KEY
-      }
-    }
+        openai: process.env.OPENAI_API_KEY,
+      },
+    },
   },
   api: {
     openai: {
-      model: "gpt-4",
+      model: 'gpt-4',
       temperature: 0.7,
-      maxTokens: 1000
+      maxTokens: 1000,
     },
     tavily: {
-      searchDepth: "advanced",
+      searchDepth: 'advanced',
       includeDomains: [
-        "news.google.com",
-        "reuters.com",
-        "bloomberg.com",
-        "techcrunch.com",
-        "theverge.com"
-      ]
-    }
+        'news.google.com',
+        'reuters.com',
+        'bloomberg.com',
+        'techcrunch.com',
+        'theverge.com',
+      ],
+    },
   },
   workflowDefaults: {
     maxRetries: 3,
     timeoutMs: 60000, // Increased to 60 seconds
-    concurrentTasks: 2  // Reduced to prevent rate limiting
-  }
+    concurrentTasks: 2, // Reduced to prevent rate limiting
+  },
 };

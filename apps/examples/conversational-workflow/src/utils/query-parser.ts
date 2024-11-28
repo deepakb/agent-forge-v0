@@ -41,7 +41,7 @@ export class QueryParser {
         model: config.api.openai.model,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
-        max_tokens: 500
+        max_tokens: 500,
       });
 
       const content = response.choices[0].message.content;
@@ -53,7 +53,7 @@ export class QueryParser {
       return {
         originalQuery: query,
         intent: parsed.intent,
-        subTasks: parsed.subtasks
+        subTasks: parsed.subtasks,
       };
     } catch (error) {
       console.error('Error parsing query:', error);
@@ -65,26 +65,26 @@ export class QueryParser {
   private fallbackParsing(query: string): ParsedQuery {
     // Simple rule-based fallback
     const subtasks: SubTask[] = [];
-    
+
     if (query.toLowerCase().includes('news')) {
       subtasks.push({
         type: 'news_fetch',
         action: 'fetch_recent',
-        parameters: { topic: query }
+        parameters: { topic: query },
       });
     }
-    
+
     // Always add summarization as final step
     subtasks.push({
       type: 'summarization',
       action: 'summarize_results',
-      parameters: { format: 'concise' }
+      parameters: { format: 'concise' },
     });
 
     return {
       originalQuery: query,
       intent: 'information_request',
-      subTasks: subtasks
+      subTasks: subtasks,
     };
   }
 }
