@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { BaseAgentConfig } from '../types';
+import { AgentConfig } from '../types';
 import { LoggerService } from './logger';
 
 export class OpenAIHelper {
@@ -8,7 +8,7 @@ export class OpenAIHelper {
   private retryDelay = 1000; // Start with 1 second
   private maxRetries = 3;
 
-  constructor(config: BaseAgentConfig) {
+  constructor(config: AgentConfig) {
     this.logger = LoggerService.getInstance();
 
     if (!config.openaiApiKey) {

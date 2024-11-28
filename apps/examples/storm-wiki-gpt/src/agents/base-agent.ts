@@ -1,13 +1,13 @@
 import { EventEmitter } from 'events';
-import { AgentMessage, BaseAgentConfig, TaskResult } from '../types';
+import { AgentMessage, AgentConfig, TaskResult } from '../types';
 import { LoggerService } from '../utils/logger';
 
 export abstract class BaseAgent {
-  protected config: BaseAgentConfig;
+  protected config: AgentConfig;
   protected emitter: EventEmitter;
   protected logger: LoggerService;
 
-  constructor(config: BaseAgentConfig) {
+  constructor(config: AgentConfig) {
     this.config = config;
     this.emitter = new EventEmitter();
     this.logger = LoggerService.getInstance();

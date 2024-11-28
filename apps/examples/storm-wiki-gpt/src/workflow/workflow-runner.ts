@@ -112,8 +112,11 @@ export class WorkflowRunner {
       // Create and submit initial task
       const task: Task = {
         id: uuidv4(),
-        agentId: this.queryAgentId,
-        message: initialMessage,
+        type: 'INITIAL',
+        data: {
+          agentId: this.queryAgentId,
+          message: initialMessage
+        }
       };
 
       const result = await this.submitTask(task);
@@ -133,11 +136,13 @@ export class WorkflowRunner {
   }
 
   private async submitTask(task: Task): Promise<TaskResult> {
-    const agent = this.getAgent(task.agentId);
+    const agentId = (task.data as { agentId: string }).agentId;
+    const message = (task.data as { message: AgentMessage }).message;
+    const agent = this.getAgent(agentId);
     if (!agent) {
-      throw new Error(`Agent not found for ID: ${task.agentId}`);
+      throw new Error(`Agent not found for ID: ${agentId}`);
     }
-    return agent.handleMessage(task.message);
+    return agent.handleMessage(message);
   }
 
   private getAgent(agentId: string): QueryAgent | FetchAgent | SynthesisAgent | undefined {
@@ -168,8 +173,11 @@ export class WorkflowRunner {
       // Create and submit next task
       const task: Task = {
         id: uuidv4(),
-        agentId: message.target,
-        message,
+        type: 'MESSAGE',
+        data: {
+          agentId: message.target,
+          message
+        }
       };
 
       const nextResult = await this.submitTask(task);

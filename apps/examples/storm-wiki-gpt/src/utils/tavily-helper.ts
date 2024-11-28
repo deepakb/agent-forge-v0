@@ -1,4 +1,4 @@
-import { BaseAgentConfig, SearchResult } from '../types';
+import { AgentConfig, SearchResult } from '../types';
 import { LoggerService } from './logger';
 
 export class TavilyHelper {
@@ -7,7 +7,7 @@ export class TavilyHelper {
   private retryDelay = 1000; // Start with 1 second
   private maxRetries = 3;
 
-  constructor(config: BaseAgentConfig) {
+  constructor(config: AgentConfig) {
     this.logger = LoggerService.getInstance();
 
     if (!config.tavilyApiKey) {

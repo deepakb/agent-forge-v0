@@ -50,8 +50,10 @@ export const SynthesisAgentConfigSchema = BaseAgentConfigSchema;
 // Task Types
 export interface Task {
   id: string;
-  agentId: string;
-  message: AgentMessage;
+  type: string;
+  data: unknown;
+  config?: TaskConfig;
+  metadata?: TaskMetadata;
 }
 
 export interface TaskResult {
@@ -78,9 +80,41 @@ export interface TaskMetadata {
 }
 
 // Agent Types
-export type SearchResult = z.infer<typeof SearchResultSchema>;
-export type AgentMessage = z.infer<typeof AgentMessageSchema>;
-export type BaseAgentConfig = z.infer<typeof BaseAgentConfigSchema>;
-export type QueryAgentConfig = z.infer<typeof QueryAgentConfigSchema>;
-export type FetchAgentConfig = z.infer<typeof FetchAgentConfigSchema>;
-export type SynthesisAgentConfig = z.infer<typeof SynthesisAgentConfigSchema>;
+export interface SearchResult {
+  url: string;
+  title: string;
+  content: string;
+  score: number;
+}
+
+export interface AgentMessage {
+  type: MessageType;
+  source: string;
+  target: string;
+  data: any;
+}
+
+export interface AgentConfig {
+  id?: string;
+  name?: string;
+  type?: string;
+  agentType: string;
+  capabilities?: string[];
+  maxConcurrentTasks?: number;
+  retryAttempts?: number;
+  openaiApiKey: string;
+  tavilyApiKey: string;
+  logLevel?: string;
+  maxRetries?: number;
+  timeout?: number;
+}
+
+export interface QueryAgentConfig extends AgentConfig {
+  fetchAgentId: string;
+}
+
+export interface FetchAgentConfig extends AgentConfig {
+  synthesisAgentId: string;
+}
+
+export interface SynthesisAgentConfig extends AgentConfig {}
