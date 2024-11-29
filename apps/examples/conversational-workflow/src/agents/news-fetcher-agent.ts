@@ -68,16 +68,18 @@ export class NewsFetcherAgent extends BaseAgent<NewsFetcherAgentState> {
     console.log(`NewsFetcherAgent initialized with ID: ${this.id}`);
   }
 
-  public async processMessage(message: Message): Promise<void> {
+  protected async handleMessage(message: Message): Promise<void> {
     try {
-      this.updateState({
-        status: 'processing',
-        lastMessage: message,
-      });
+      console.log(`NewsFetcherAgent (${this.id}): Received message of type ${message.type}`);
 
-      switch (message.type) {
+      switch (message.type.toLowerCase()) {
+        case 'news_request':
         case 'query':
-          await this.handleQuery(message);
+          await this.handleNewsRequest(message);
+          break;
+        case 'workflow_start':
+          // Ignore workflow_start messages
+          console.log(`NewsFetcherAgent (${this.id}): Ignoring workflow_start message`);
           break;
         case 'system':
           if (message.content === 'shutdown') {
@@ -85,13 +87,75 @@ export class NewsFetcherAgent extends BaseAgent<NewsFetcherAgentState> {
           }
           break;
         default:
-          throw new Error(`Unsupported message type: ${message.type}`);
+          console.log(`NewsFetcherAgent (${this.id}): Ignoring message of type ${message.type}`);
       }
-
-      this.updateState({ status: 'idle' });
     } catch (error) {
-      await this.handleError(error instanceof Error ? error : new Error(String(error)));
+      await this.handleError(error);
     }
+  }
+
+  private async handleNewsRequest(message: Message): Promise<void> {
+    try {
+      const query = typeof message.content === 'string' ? message.content : message.content.query;
+      console.log(`NewsFetcherAgent (${this.id}): Processing news request for query: "${query}"`);
+      
+      this.updateState({ 
+        status: 'processing',
+        lastMessage: message 
+      } as Partial<NewsFetcherAgentState>);
+
+      // Process the query and get news results
+      const results = await this.searchNews(query);
+
+      // Send back the response
+      await this.sendMessage({
+        type: 'news_response',
+        content: {
+          query,
+          results,
+          type: 'news'
+        },
+        metadata: {
+          ...message.metadata,
+          source: this.type,
+          target: message.metadata.source,
+          timestamp: Date.now()
+        }
+      });
+
+      this.updateState({ status: 'idle' } as Partial<NewsFetcherAgentState>);
+    } catch (error) {
+      await this.handleError(error);
+    }
+  }
+
+  private async searchNews(query: string): Promise<TavilyResponse['results']> {
+    let retries = 0;
+    while (retries < this.maxRetries) {
+      try {
+        const response = await axios.post(this.baseUrl, {
+          query,
+          api_key: this.tavily.apiKey,
+          search_depth: 'advanced',
+          include_domains: this.includeDomains,
+          search_type: 'news'
+        });
+
+        if (response.data.status === 'success') {
+          return response.data.results;
+        } else {
+          throw new Error(`Tavily API error: ${response.data.status}`);
+        }
+      } catch (error) {
+        retries++;
+        if (retries === this.maxRetries) {
+          throw error;
+        }
+        // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 1000));
+      }
+    }
+    throw new Error('Max retries exceeded');
   }
 
   private async handleQuery(message: Message): Promise<void> {
@@ -183,6 +247,32 @@ export class NewsFetcherAgent extends BaseAgent<NewsFetcherAgentState> {
         await new Promise(resolve => setTimeout(resolve, backoffMs));
         return this.makeRequest(query, retryCount + 1);
       }
+      throw error;
+    }
+  }
+
+  private async fetchNews(query: string): Promise<any> {
+    try {
+      const response = await this.makeRequest(query);
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching news (${this.id}):`, error);
+      throw error;
+    }
+  }
+
+  private async updateNewsConfig(config: any): Promise<void> {
+    try {
+      // Here you would implement the logic to update news sources or filters
+      // This could involve updating API configurations, sources list, etc.
+      console.log(`NewsFetcherAgent (${this.id}): Updating news configuration with:`, config);
+      
+      // For now, we'll just simulate an update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      console.log(`NewsFetcherAgent (${this.id}): News configuration updated successfully`);
+    } catch (error) {
+      console.error(`Error updating news configuration (${this.id}):`, error);
       throw error;
     }
   }
