@@ -2,43 +2,10 @@ import { Container } from '@/components/ui/container'
 
 const features = [
   {
-    title: 'TypeScript-First Architecture',
-    description: 'Built from the ground up with TypeScript, offering full type safety, IDE support, and enterprise-grade code quality.',
-    techDetail: 'End-to-end type safety',
-    benefits: ['Full IDE Support', 'Type Safety', 'Code Quality'],
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-      </svg>
-    )
-  },
-  {
-    title: 'Enterprise Security',
-    description: 'Production-ready security features including message encryption, audit logging, and role-based access control.',
-    techDetail: 'SOC2 compliant',
-    benefits: ['Message Encryption', 'Audit Logging', 'Access Control'],
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-      </svg>
-    )
-  },
-  {
-    title: 'Distributed Memory',
-    description: 'High-performance distributed state management using Redis, handling millions of concurrent agent operations.',
-    techDetail: '10M+ ops/second',
-    benefits: ['High Performance', 'Distributed State', 'Scalable'],
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    )
-  },
-  {
-    title: 'Multi-Provider Support',
-    description: 'Enterprise-ready integrations with OpenAI, Anthropic, Azure, and custom LLM deployments with type-safe interfaces.',
-    techDetail: 'Provider-agnostic',
-    benefits: ['OpenAI Support', 'Anthropic Ready', 'Azure Integration'],
+    title: 'Event-Driven Architecture',
+    description: 'Built on a robust event system with EventEmitter3, enabling real-time state updates and reactive agent behaviors.',
+    techDetail: 'Real-time Events',
+    benefits: ['State Updates', 'Message Routing', 'Event Handlers'],
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -46,24 +13,57 @@ const features = [
     )
   },
   {
-    title: 'Enterprise Observability',
-    description: 'Production-grade monitoring with OpenTelemetry integration, distributed tracing, and real-time metrics.',
-    techDetail: 'Full observability',
-    benefits: ['Real-time Metrics', 'Distributed Tracing', 'Error Tracking'],
+    title: 'State Management',
+    description: 'Enterprise-grade Redis-backed state store with distributed task management and workflow orchestration.',
+    techDetail: 'Redis-powered',
+    benefits: ['Distributed State', 'Task Tracking', 'Workflow States'],
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
       </svg>
     )
   },
   {
-    title: 'Production Workflows',
-    description: 'Enterprise workflow engine with distributed execution, error handling, and state persistence built-in.',
-    techDetail: 'Battle-tested',
-    benefits: ['Error Recovery', 'State Persistence', 'Distributed Tasks'],
+    title: 'Agent Lifecycle',
+    description: 'Complete agent lifecycle management with initialization, heartbeat monitoring, and graceful termination.',
+    techDetail: 'Full Lifecycle',
+    benefits: ['Health Monitoring', 'Auto Recovery', 'Graceful Shutdown'],
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+    )
+  },
+  {
+    title: 'Workflow Orchestration',
+    description: 'Sophisticated workflow engine with dependency resolution, parallel execution, and comprehensive error handling.',
+    techDetail: 'Enterprise-grade',
+    benefits: ['Parallel Tasks', 'Error Recovery', 'Step Management'],
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+      </svg>
+    )
+  },
+  {
+    title: 'Message Broker',
+    description: 'Reliable message routing system with pub/sub capabilities, message acknowledgment, and error handling.',
+    techDetail: 'High Throughput',
+    benefits: ['Pub/Sub System', 'Message Routing', 'Error Handling'],
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+      </svg>
+    )
+  },
+  {
+    title: 'LLM Integration',
+    description: 'Seamless OpenAI integration with type-safe interfaces and extensible provider architecture.',
+    techDetail: 'OpenAI Ready',
+    benefits: ['Type Safety', 'Provider System', 'Easy Extension'],
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
       </svg>
     )
   }

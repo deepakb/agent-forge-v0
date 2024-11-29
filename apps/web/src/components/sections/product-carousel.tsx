@@ -1,5 +1,7 @@
+'use client'
+
 import * as React from "react"
-import useEmblaCarousel, { EmblaCarouselType } from 'embla-carousel-react'
+import useEmblaCarousel from 'embla-carousel-react'
 import AutoPlay from 'embla-carousel-autoplay'
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,103 +18,113 @@ type Product = {
 
 const products: Product[] = [
   {
-    title: "Agent Development Studio",
-    description: "Build and test AI agents with our enterprise-grade development environment. Includes visual builder, real-time testing, and comprehensive debugging tools.",
-    features: ["Visual Builder", "Real-time Testing", "Version Control", "Team Collaboration"],
+    title: "Agent Orchestration Engine",
+    description: "Enterprise-grade agent orchestration with advanced state management, real-time monitoring, and fault tolerance. Built for high-reliability and scalability.",
+    features: ["State Management", "Real-time Monitoring", "Fault Tolerance", "Event-driven Architecture"],
     metrics: [
-      { label: "Deployment Time", value: "↓60%" },
-      { label: "Development Speed", value: "↑3x" },
+      { label: "Reliability", value: "99.99%" },
+      { label: "Scalability", value: "∞" },
     ],
     status: "GA",
     statusVariant: "success",
   },
   {
-    title: "Deployment Platform",
-    description: "Deploy and scale AI agents with enterprise-grade reliability and monitoring. Built-in observability, auto-scaling, and production safeguards.",
-    features: ["Auto-scaling", "Monitoring", "Load Balancing", "Zero-downtime"],
+    title: "Workflow Management System",
+    description: "Sophisticated workflow orchestration with dependency management, parallel execution, and comprehensive error handling. Perfect for complex enterprise workflows.",
+    features: ["Dependency Resolution", "Parallel Execution", "Error Recovery", "Progress Tracking"],
     metrics: [
-      { label: "Uptime", value: "99.99%" },
-      { label: "Response Time", value: "<100ms" },
+      { label: "Step Recovery", value: "100%" },
+      { label: "Concurrency", value: "N+1" },
     ],
     status: "Beta",
     statusVariant: "info",
   },
   {
-    title: "Enterprise Hub",
-    description: "Access verified enterprise agents and components with compliance built-in. Includes security scanning, audit logs, and enterprise support.",
-    features: ["Verified Agents", "Compliance", "Enterprise Support", "Audit Logs"],
+    title: "Enterprise Integration Hub",
+    description: "Secure communication layer with built-in message routing, state persistence, and enterprise-grade logging. Includes Redis-backed state management and OpenAI integration.",
+    features: ["Message Routing", "State Persistence", "OpenAI Integration", "Redis Support"],
     metrics: [
-      { label: "Security Score", value: "A+" },
-      { label: "Compliance", value: "SOC2" },
+      { label: "Message Rate", value: "10K/s" },
+      { label: "Data Safety", value: "100%" },
     ],
     status: "Preview",
     statusVariant: "warning",
   },
 ]
 
-const autoplay = AutoPlay({ delay: 5000, stopOnInteraction: false })
-
 export function ProductCarousel() {
+  // Initialize autoplay plugin
+  const [autoplayRef] = React.useState(() => 
+    AutoPlay({ 
+      delay: 5000, 
+      stopOnInteraction: false,
+      stopOnMouseEnter: false,
+      rootNode: (emblaRoot) => emblaRoot.parentElement,
+    })
+  )
+
+  // Initialize carousel
   const [emblaRef, emblaApi] = useEmblaCarousel(
     { 
       loop: true,
       align: 'center',
+      skipSnaps: false,
       dragFree: false,
-    }, 
-    [autoplay]
+    },
+    [autoplayRef]
   )
 
-  const [canScrollPrev, setCanScrollPrev] = React.useState(false)
-  const [canScrollNext, setCanScrollNext] = React.useState(true)
+  const [prevBtnDisabled, setPrevBtnDisabled] = React.useState(true)
+  const [nextBtnDisabled, setNextBtnDisabled] = React.useState(true)
   const [selectedIndex, setSelectedIndex] = React.useState(0)
 
   const scrollPrev = React.useCallback(() => {
-    if (emblaApi) emblaApi.scrollPrev()
+    if (emblaApi) {
+      emblaApi.scrollPrev()
+    }
   }, [emblaApi])
 
   const scrollNext = React.useCallback(() => {
-    if (emblaApi) emblaApi.scrollNext()
+    if (emblaApi) {
+      emblaApi.scrollNext()
+    }
   }, [emblaApi])
 
   const scrollTo = React.useCallback((index: number) => {
-    if (emblaApi) emblaApi.scrollTo(index)
+    if (emblaApi) {
+      emblaApi.scrollTo(index)
+    }
   }, [emblaApi])
 
-  const onInit = React.useCallback((emblaApi: EmblaCarouselType) => {
-    setCanScrollPrev(emblaApi.canScrollPrev())
-    setCanScrollNext(emblaApi.canScrollNext())
-  }, [])
+  const onSelect = React.useCallback(() => {
+    if (!emblaApi) return
 
-  const onSelect = React.useCallback((emblaApi: EmblaCarouselType) => {
     setSelectedIndex(emblaApi.selectedScrollSnap())
-    setCanScrollPrev(emblaApi.canScrollPrev())
-    setCanScrollNext(emblaApi.canScrollNext())
-  }, [])
+    setPrevBtnDisabled(!emblaApi.canScrollPrev())
+    setNextBtnDisabled(!emblaApi.canScrollNext())
+  }, [emblaApi])
 
   React.useEffect(() => {
     if (!emblaApi) return
 
-    emblaApi.on('init', onInit)
+    onSelect()
     emblaApi.on('select', onSelect)
-    emblaApi.on('reInit', onInit)
-
-    onInit(emblaApi)
+    emblaApi.on('reInit', onSelect)
 
     return () => {
-      emblaApi.off('init', onInit)
       emblaApi.off('select', onSelect)
-      emblaApi.off('reInit', onInit)
+      emblaApi.off('reInit', onSelect)
     }
-  }, [emblaApi, onInit, onSelect])
+  }, [emblaApi, onSelect])
 
   return (
-    <div className="relative">
+    <div className="relative w-full px-4 sm:px-6">
       <div className="overflow-hidden" ref={emblaRef}>
-        <div className="flex">
+        <div className="flex -ml-4">
           {products.map((product, index) => (
             <div 
-              key={index} 
-              className="flex-[0_0_100%] min-w-0 pl-4 relative"
+              key={index}
+              className="flex-[0_0_100%] min-w-0 pl-4"
             >
               <div className="rounded-lg border border-white/10 bg-white/5 p-8 hover:bg-white/[0.07] transition-colors min-h-[360px]">
                 <div className="space-y-6">
@@ -185,7 +197,7 @@ export function ProductCarousel() {
             variant="outline"
             size="icon"
             onClick={scrollPrev}
-            disabled={!canScrollPrev}
+            disabled={prevBtnDisabled}
             className="h-8 w-8 border-0 bg-white/5 hover:bg-white/10 text-white rounded-full disabled:opacity-50"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -194,7 +206,7 @@ export function ProductCarousel() {
             variant="outline"
             size="icon"
             onClick={scrollNext}
-            disabled={!canScrollNext}
+            disabled={nextBtnDisabled}
             className="h-8 w-8 border-0 bg-white/5 hover:bg-white/10 text-white rounded-full disabled:opacity-50"
           >
             <ChevronRight className="h-4 w-4" />
