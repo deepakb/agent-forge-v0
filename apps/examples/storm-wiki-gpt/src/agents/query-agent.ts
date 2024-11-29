@@ -23,10 +23,23 @@ export class QueryAgent extends BaseAgent {
         try {
           return JSON.parse(match[0]);
         } catch (e) {
-          throw new Error('Failed to parse JSON array from response');
+          // If JSON parsing fails, try to parse line by line
+          const lines = text.split('\n')
+            .map(line => line.trim())
+            .filter(line => line.startsWith('"') || line.startsWith('['))
+            .map(line => {
+              // Extract the query from the line
+              const match = line.match(/"([^"]+)"/);
+              return match ? match[1] : null;
+            })
+            .filter((query): query is string => query !== null);
+          
+          if (lines.length > 0) {
+            return lines;
+          }
         }
       }
-      throw new Error('No JSON array found in response');
+      throw new Error('No valid queries found in response');
     }
   }
 

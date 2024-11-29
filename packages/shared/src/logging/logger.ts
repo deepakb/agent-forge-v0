@@ -1,19 +1,13 @@
 import { LogHandler } from './log-handler';
 import { formatLogEntry, StructuredLogEntry } from './log-formatter';
 import { formatError } from '../errors/error-formatter';
-
-export interface LoggerConfig {
-  component?: string;
-  workflowId?: string;
-  agentId?: string;
-  agentType?: string;
-}
+import { LoggerConfig } from './types';
 
 export class Logger {
   private static handler: LogHandler;
-  private static defaultConfig: LoggerConfig = {};
+  private static defaultConfig: Partial<LoggerConfig> = {};
 
-  public static initialize(config?: LoggerConfig): void {
+  public static initialize(config?: Partial<LoggerConfig>): void {
     this.defaultConfig = config || {};
     this.handler = LogHandler.getInstance();
   }

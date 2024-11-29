@@ -52,31 +52,36 @@ export interface Task {
   id: string;
   type: string;
   data: unknown;
-  config?: TaskConfig;
+  config: TaskConfig;
   metadata?: TaskMetadata;
+  secure?: boolean;
 }
 
 export interface TaskResult {
   success: boolean;
-  data?: unknown;
   error?: string;
+  data?: unknown;
   message?: AgentMessage;
 }
 
 export interface TaskConfig {
   id: string;
   type: string;
-  priority: string;
   retryAttempts: number;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   dependencies: string[];
   requiredCapabilities: string[];
+  timeout?: number;
+  secure?: boolean;
 }
 
 export interface TaskMetadata {
-  status: string;
-  createdAt: Date;
-  attempts: number;
-  progress: number;
+  startTime?: string;
+  endTime?: string;
+  duration?: number;
+  status?: string;
+  error?: string;
+  retryCount?: number;
 }
 
 // Agent Types
@@ -94,19 +99,33 @@ export interface AgentMessage {
   data: any;
 }
 
+export interface SecurityConfig {
+  encryption?: {
+    messages?: boolean;       // Enable/disable message encryption
+    state?: boolean;         // Enable/disable state encryption
+  };
+  audit?: {
+    enabled?: boolean;       // Enable/disable audit logging
+    level?: 'basic' | 'detailed';
+  };
+}
+
 export interface AgentConfig {
-  id?: string;
-  name?: string;
-  type?: string;
-  agentType: string;
-  capabilities?: string[];
-  maxConcurrentTasks?: number;
-  retryAttempts?: number;
+  agentType?: string;
   openaiApiKey: string;
   tavilyApiKey: string;
   logLevel?: string;
-  maxRetries?: number;
-  timeout?: number;
+  encryptionKey?: string;
+  securityConfig?: SecurityConfig;
+  synthesisAgentId?: string;
+  fetchAgentId?: string;
+  queryAgentId?: string;
+  type: string;
+  id: string;
+  name: string;
+  capabilities: string[];
+  maxConcurrentTasks: number;
+  retryAttempts: number;
 }
 
 export interface QueryAgentConfig extends AgentConfig {

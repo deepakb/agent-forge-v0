@@ -7,6 +7,8 @@ export class OpenAIHelper {
   private logger: LoggerService;
   private retryDelay = 1000; // Start with 1 second
   private maxRetries = 3;
+  private lastCallTime = 0;
+  private minTimeBetweenCalls = 1000; // Minimum 1 second between calls
 
   constructor(config: AgentConfig) {
     this.logger = LoggerService.getInstance();
@@ -33,10 +35,27 @@ export class OpenAIHelper {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  private async enforceRateLimit(): Promise<void> {
+    const now = Date.now();
+    const timeSinceLastCall = now - this.lastCallTime;
+    
+    if (timeSinceLastCall < this.minTimeBetweenCalls) {
+      const waitTime = this.minTimeBetweenCalls - timeSinceLastCall;
+      this.logger.info('Rate limiting: waiting before next API call', {
+        waitTime,
+      });
+      await this.delay(waitTime);
+    }
+    
+    this.lastCallTime = Date.now();
+  }
+
   private async completeWithRetry(prompt: string, attempt = 1): Promise<string> {
     try {
+      await this.enforceRateLimit();
+
       const response = await this.openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-3.5-turbo-16k',
         messages: [
           {
             role: 'system',
@@ -48,7 +67,7 @@ export class OpenAIHelper {
           },
         ],
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: 4000,
       });
 
       const result = response.choices[0]?.message?.content?.trim();
@@ -59,6 +78,7 @@ export class OpenAIHelper {
 
       // Reset retry delay on success
       this.retryDelay = 1000;
+      this.lastCallTime = Date.now();
 
       return result;
     } catch (error) {
@@ -71,14 +91,13 @@ export class OpenAIHelper {
         (error instanceof OpenAI.APIError && error.status === 429)
       ) {
         if (attempt <= this.maxRetries) {
+          const retryDelay = this.retryDelay * Math.pow(2, attempt - 1); // Exponential backoff
           this.logger.info('Rate limited by OpenAI API, retrying...', {
             attempt,
-            retryDelay: this.retryDelay,
+            retryDelay,
           });
 
-          await this.delay(this.retryDelay);
-          // Exponential backoff
-          this.retryDelay *= 2;
+          await this.delay(retryDelay);
           return this.completeWithRetry(prompt, attempt + 1);
         }
         const rateLimitError = new Error(`Rate limited by OpenAI API after ${attempt} attempts`);
