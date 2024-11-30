@@ -1,273 +1,225 @@
 import { EventEmitter } from 'events';
+import { v4 as uuidv4 } from 'uuid';
+import { SecurityManager, SecurityConfig } from '../security/security-manager';
 import { CommunicationHub } from '../communication/communication-hub';
+import { Message, IAgent } from '../agents/base-agent';
+import { AuditLogger } from '../security/audit-logger';
 import { ChatbotAgent } from '../agents/chatbot-agent';
-import { NewsFetcherAgent } from '../agents/news-fetcher-agent';
 import { KnowledgeAgent } from '../agents/knowledge-agent';
+import { NewsFetcherAgent } from '../agents/news-fetcher-agent';
 import { SummarizationAgent } from '../agents/summarization-agent';
-import { IAgent, Message } from '../agents/base-agent';
-import { AgentConfig, config } from '../config/config';
 
-interface WorkflowContext {
-  id: string;
-  startTime: number;
-  query: string;
-  status: 'active' | 'completed' | 'error';
-  error?: Error;
-  agentStates: Map<string, any>;
+export interface WorkflowConfig {
+  maxRetries?: number;
+  timeout?: number;
+  securityConfig?: SecurityConfig;
+  agents: {
+    [key: string]: {
+      type: string;
+      config: any;
+    };
+  };
 }
 
 export class WorkflowManager extends EventEmitter {
+  private config: WorkflowConfig;
+  private securityManager: SecurityManager;
   private communicationHub: CommunicationHub;
+  private auditLogger: AuditLogger;
+  private activeWorkflows: Map<string, any>;
   private agents: Map<string, IAgent>;
-  private activeWorkflows: Map<string, WorkflowContext>;
-  private readonly workflowTimeoutMs: number;
-  private readonly maxRetries: number;
 
-  constructor(agentConfigs: Record<string, AgentConfig>) {
+  constructor(config: WorkflowConfig) {
     super();
-    this.communicationHub = new CommunicationHub();
-    this.agents = new Map();
+    this.config = {
+      maxRetries: 3,
+      timeout: 60000,
+      ...config
+    };
+
     this.activeWorkflows = new Map();
-    this.workflowTimeoutMs = config.workflowDefaults.timeoutMs;
-    this.maxRetries = config.workflowDefaults.maxRetries;
+    this.auditLogger = AuditLogger.getInstance();
+    this.securityManager = SecurityManager.getInstance(this.config.securityConfig);
+    this.communicationHub = CommunicationHub.getInstance();
+    this.agents = new Map();
 
-    console.log('Initializing WorkflowManager with config:', {
-      timeoutMs: this.workflowTimeoutMs,
-      maxRetries: this.maxRetries,
-      concurrentTasks: config.workflowDefaults.concurrentTasks,
-    });
-
-    // Initialize agents with their configurations
-    Object.entries(agentConfigs).forEach(([type, config]) => {
-      const agent = this.createAgent(type, config);
-      if (agent) {
-        this.agents.set(config.id, agent);
-        this.communicationHub.registerAgent(agent);
-
-        // Forward agent state changes
-        agent.on('state_change', state => {
-          this.handleAgentStateChange(agent.id, state);
-        });
-
-        // Forward agent errors
-        agent.on('error', error => {
-          this.handleAgentError(agent.id, error);
-        });
-      }
-    });
-
-    // Set up communication hub error handling
-    this.communicationHub.on('error', (error: Error) => {
-      console.error('Communication hub error:', error);
-      this.emit('error', error);
-    });
-
-    // Listen for workflow completion events
-    this.communicationHub.on('workflow_complete', (workflowId: string) => {
-      this.completeWorkflow(workflowId);
-    });
-
-    // Listen for workflow errors
-    this.communicationHub.on('workflow_error', (data: { workflowId: string; error: Error }) => {
-      this.handleWorkflowError(data.workflowId, data.error);
-    });
+    this.initializeAgents();
+    this.setupEventListeners();
   }
 
-  private handleAgentStateChange(agentId: string, state: any) {
-    // Update workflow context with agent state
-    for (const [workflowId, context] of this.activeWorkflows.entries()) {
-      if (context.agentStates.has(agentId)) {
-        context.agentStates.set(agentId, state);
-        this.emit('agent_state_change', { workflowId, agentId, state });
-      }
-    }
-  }
+  private initializeAgents(): void {
+    for (const [agentId, agentConfig] of Object.entries(this.config.agents)) {
+      let agent: IAgent;
 
-  private handleAgentError(agentId: string, error: Error) {
-    console.error(`Agent error (${agentId}):`, error);
-    this.emit('error', error);
-
-    // Check if error affects any active workflows
-    for (const [workflowId, context] of this.activeWorkflows.entries()) {
-      if (context.agentStates.has(agentId)) {
-        this.handleWorkflowError(workflowId, error);
-      }
-    }
-  }
-
-  private completeWorkflow(workflowId: string) {
-    const context = this.activeWorkflows.get(workflowId);
-    if (context) {
-      context.status = 'completed';
-      const duration = Date.now() - context.startTime;
-      console.log(`Workflow ${workflowId} completed in ${duration}ms`);
-      this.activeWorkflows.delete(workflowId);
-      this.emit('workflow_complete', { workflowId, duration });
-    }
-  }
-
-  private handleWorkflowError(workflowId: string, error: Error) {
-    const context = this.activeWorkflows.get(workflowId);
-    if (context) {
-      context.status = 'error';
-      context.error = error;
-      const duration = Date.now() - context.startTime;
-      console.error(`Workflow ${workflowId} failed after ${duration}ms:`, error);
-      this.activeWorkflows.delete(workflowId);
-      this.emit('workflow_error', { workflowId, error, duration });
-    }
-  }
-
-  private createAgent(type: string, config: AgentConfig): IAgent | null {
-    try {
-      console.log(`Creating agent: ${type} (${config.id})`);
-      switch (type) {
+      switch (agentConfig.type.toLowerCase()) {
         case 'chatbot':
-          return new ChatbotAgent(config);
-        case 'newsFetcher':
-          return new NewsFetcherAgent(config);
+          agent = new ChatbotAgent({ id: agentId, ...agentConfig.config });
+          break;
         case 'knowledge':
-          return new KnowledgeAgent(config);
+          agent = new KnowledgeAgent({ id: agentId, ...agentConfig.config });
+          break;
+        case 'newsfetcher':
+          agent = new NewsFetcherAgent({ id: agentId, ...agentConfig.config });
+          break;
         case 'summarization':
-          return new SummarizationAgent(config);
+          agent = new SummarizationAgent({ id: agentId, ...agentConfig.config });
+          break;
         default:
-          throw new Error(`Unknown agent type: ${type}`);
+          throw new Error(`Unknown agent type: ${agentConfig.type}`);
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`Failed to create agent ${type}:`, errorMessage);
-      this.emit('error', new Error(`Failed to create agent ${type}: ${errorMessage}`));
-      return null;
+
+      this.agents.set(agentId, agent);
+      this.communicationHub.registerAgent(agentId, agent);
+
+      // Set up agent error handling
+      agent.on('error', (error: Error) => {
+        this.handleError(error, { agentId });
+      });
+
+      // Log agent initialization
+      this.auditLogger.logSecurityEvent(
+        'AGENT_INITIALIZED',
+        { agentId, type: agentConfig.type },
+        'info'
+      );
     }
+  }
+
+  private setupEventListeners(): void {
+    this.communicationHub.on('message', this.handleMessage.bind(this));
+    this.communicationHub.on('error', this.handleError.bind(this));
   }
 
   public async processQuery(query: string): Promise<void> {
+    const workflowId = uuidv4();
+    
     try {
-      // Get the chatbot agent as the primary coordinator
-      const chatbotAgent = Array.from(this.agents.values()).find(
-        agent => agent instanceof ChatbotAgent
-      );
-
-      if (!chatbotAgent) {
-        throw new Error('Chatbot agent not found in workflow');
-      }
-
-      // Create a workflow context
-      const workflowId = Date.now().toString();
-      const context: WorkflowContext = {
-        id: workflowId,
-        startTime: Date.now(),
-        query,
+      this.activeWorkflows.set(workflowId, {
         status: 'active',
-        agentStates: new Map(Array.from(this.agents.values()).map(agent => [agent.id, null])),
-      };
-
-      this.activeWorkflows.set(workflowId, context);
-      console.log(`Starting workflow ${workflowId} for query: "${query}"`);
-
-      // Set up workflow completion listener with configurable timeout
-      const workflowComplete = new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          const error = new Error(`Workflow timeout after ${this.workflowTimeoutMs}ms`);
-          this.handleWorkflowError(workflowId, error);
-          reject(error);
-        }, this.workflowTimeoutMs);
-
-        this.once(`workflow_complete_${workflowId}`, () => {
-          clearTimeout(timeout);
-          this.completeWorkflow(workflowId);
-          resolve();
-        });
-
-        this.once(`workflow_error_${workflowId}`, error => {
-          clearTimeout(timeout);
-          this.handleWorkflowError(workflowId, error);
-          reject(error);
-        });
+        startTime: Date.now(),
+        query
       });
 
-      // Initialize the workflow with the chatbot agent
-      await chatbotAgent.processMessage({
-        type: 'query',
-        content: query,
+      const message: Message = {
+        type: 'workflow_start',
+        content: { query },
         metadata: {
           workflowId,
-          timestamp: Date.now(),
-          source: 'user',
-          target: 'chatbot',
-        },
-      });
+          source: 'workflow_manager',
+          timestamp: Date.now()
+        }
+      };
 
-      // Wait for workflow completion or timeout
-      await workflowComplete;
+      await this.securityManager.processMessage(message, 'workflow_manager');
+      await this.communicationHub.broadcast(message);
+
+      this.auditLogger.logSecurityEvent(
+        'WORKFLOW_START',
+        { workflowId, query },
+        'info'
+      );
     } catch (error) {
-      console.error('Error processing query:', error);
-      this.emit('error', error);
-      throw error;
+      const errorMessage = error instanceof Error ? error : new Error(String(error));
+      await this.handleError(errorMessage, { workflowId });
+      throw errorMessage;
+    }
+  }
+
+  private async handleMessage(message: Message): Promise<void> {
+    try {
+      const { workflowId } = message.metadata;
+      
+      if (!workflowId || !this.activeWorkflows.has(workflowId)) {
+        throw new Error(`Invalid workflow ID: ${workflowId}`);
+      }
+
+      const workflow = this.activeWorkflows.get(workflowId);
+      
+      if (message.type.toLowerCase() === 'workflow_complete') {
+        await this.completeWorkflow(workflowId);
+        this.emit('workflow_complete', { workflowId, workflow });
+      } else if (message.type.toLowerCase() === 'workflow_error') {
+        const error = new Error(message.content.error);
+        await this.handleError(error, { workflowId });
+      }
+
+      this.emit('message_processed', { message, workflow });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error : new Error(String(error));
+      await this.handleError(errorMessage);
+    }
+  }
+
+  private async handleError(error: Error, context?: { workflowId?: string, agentId?: string }): Promise<void> {
+    const errorMessage = error.message || 'Unknown error occurred';
+    
+    this.auditLogger.logSecurityEvent(
+      'WORKFLOW_ERROR',
+      { error: errorMessage, ...context },
+      'error'
+    );
+
+    if (context?.workflowId) {
+      this.activeWorkflows.set(context.workflowId, {
+        ...this.activeWorkflows.get(context.workflowId),
+        status: 'error',
+        error: errorMessage
+      });
+    }
+
+    this.emit('error', { error, context });
+  }
+
+  private async completeWorkflow(workflowId: string): Promise<void> {
+    const workflow = this.activeWorkflows.get(workflowId);
+    
+    if (workflow) {
+      workflow.status = 'completed';
+      workflow.endTime = Date.now();
+      
+      await this.auditLogger.logSecurityEvent(
+        'WORKFLOW_COMPLETE',
+        { workflowId, duration: workflow.endTime - workflow.startTime },
+        'info'
+      );
+
+      this.activeWorkflows.delete(workflowId);
     }
   }
 
   public async shutdown(): Promise<void> {
     try {
-      const activeWorkflowCount = this.activeWorkflows.size;
-      if (activeWorkflowCount > 0) {
-        console.log(`Waiting for ${activeWorkflowCount} active workflows to complete...`);
-
-        // Give workflows a chance to complete gracefully
-        await Promise.race([
-          Promise.all(
-            Array.from(this.activeWorkflows.keys()).map(
-              workflowId =>
-                new Promise<void>(resolve => {
-                  this.once(`workflow_complete_${workflowId}`, resolve);
-                  this.once(`workflow_error_${workflowId}`, resolve);
-                })
-            )
-          ),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Shutdown timeout waiting for workflows')), 10000)
-          ),
-        ]);
+      // Complete all active workflows
+      for (const [workflowId, workflow] of this.activeWorkflows.entries()) {
+        if (workflow.status === 'active') {
+          await this.completeWorkflow(workflowId);
+        }
       }
 
-      console.log('Shutting down agents...');
-
-      // Notify all agents to perform cleanup
-      const shutdownPromises = Array.from(this.agents.values()).map(agent =>
-        agent
-          .processMessage({
-            type: 'system',
-            content: 'shutdown',
-            metadata: {
-              timestamp: Date.now(),
-              source: 'system',
-              target: agent.type,
-            },
-          })
-          .catch(error => {
-            console.error(`Error shutting down agent ${agent.id}:`, error);
-          })
-      );
-
-      // Wait for all agents to cleanup with a timeout
-      await Promise.race([
-        Promise.all(shutdownPromises),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Shutdown timeout waiting for agents')), 5000)
-        ),
-      ]);
-
-      // Clean up resources
-      console.log('Cleaning up resources...');
-      this.communicationHub.shutdown();
-      this.removeAllListeners();
-      this.agents.clear();
+      // Clear all active workflows
       this.activeWorkflows.clear();
-      console.log('Workflow manager shutdown complete');
+
+      // Clean up agents
+      for (const [agentId, agent] of this.agents.entries()) {
+        agent.removeAllListeners();
+        this.agents.delete(agentId);
+      }
+
+      // Remove all event listeners
+      this.removeAllListeners();
+
+      // Shutdown communication hub
+      await this.communicationHub.shutdown();
+
+      this.auditLogger.logSecurityEvent(
+        'WORKFLOW_MANAGER_SHUTDOWN',
+        { timestamp: Date.now() },
+        'info'
+      );
     } catch (error) {
-      console.error('Error during shutdown:', error);
-      this.emit('error', error);
-      throw error;
+      const errorMessage = error instanceof Error ? error : new Error(String(error));
+      await this.handleError(errorMessage);
+      throw errorMessage;
     }
   }
 }

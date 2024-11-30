@@ -27,7 +27,43 @@ class WorkflowRunner {
   private lastQueryTime: number;
 
   constructor() {
-    this.workflowManager = new WorkflowManager(config.agents);
+    this.workflowManager = new WorkflowManager({
+      maxRetries: 3,
+      timeout: 30000,
+      securityConfig: {
+        encryption: {
+          enabled: true,
+          algorithm: 'aes-256-gcm'
+        },
+        audit: {
+          enabled: true,
+          level: 'detailed'
+        },
+        rateLimiting: {
+          enabled: true,
+          maxRequests: 100,
+          timeWindow: 60000
+        }
+      },
+      agents: {
+        chatbot: {
+          type: 'chatbot',
+          config: config.agents.chatbot
+        },
+        knowledge: {
+          type: 'knowledge',
+          config: config.agents.knowledge
+        },
+        newsFetcher: {
+          type: 'newsfetcher',
+          config: config.agents.newsFetcher
+        },
+        summarization: {
+          type: 'summarization',
+          config: config.agents.summarization
+        }
+      }
+    });
     this.activeWorkflows = new Map();
     this.isShuttingDown = false;
     this.timeoutMs = config.workflowDefaults.timeoutMs;
@@ -52,9 +88,19 @@ class WorkflowRunner {
       console.log(`Agent ${agentId} state changed:`, state);
     });
 
-    this.workflowManager.on('workflow_complete', (workflowId: string) => {
-      console.log(`Workflow ${workflowId} completed successfully`);
-      this.completeWorkflow(workflowId, 'success');
+    this.workflowManager.on('workflow_complete', ({ workflowId }) => {
+      if (this.activeWorkflows.has(workflowId)) {
+        console.log(`Workflow ${workflowId} completed successfully`);
+        this.completeWorkflow(workflowId, 'success');
+      }
+    });
+
+    this.workflowManager.on('message_processed', ({ message }) => {
+      const { workflowId } = message.metadata;
+      if (workflowId && message.type === 'WORKFLOW_COMPLETE' && this.activeWorkflows.has(workflowId)) {
+        console.log(`Workflow ${workflowId} completed successfully`);
+        this.completeWorkflow(workflowId, 'success');
+      }
     });
   }
 

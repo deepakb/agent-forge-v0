@@ -32,21 +32,18 @@ export class SummarizationAgent extends BaseAgent<SummarizationAgentState> {
     console.log(`SummarizationAgent initialized with ID: ${this.id}`);
   }
 
-  public async processMessage(message: Message): Promise<void> {
+  protected async handleMessage(message: Message): Promise<void> {
     try {
-      this.updateState({
-        status: 'processing',
-        lastMessage: message,
-      });
+      console.log(`SummarizationAgent (${this.id}): Received message of type ${message.type}`);
 
-      switch (message.type) {
-        case 'summarize':
-        case 'response':
-          if (message.metadata.requiresSummarization) {
-            await this.handleSummarization(message);
-          } else {
-            throw new Error('Message does not require summarization');
-          }
+      switch (message.type.toLowerCase()) {
+        case 'summarize_request':
+        case 'query':
+          await this.handleSummarizeRequest(message);
+          break;
+        case 'workflow_start':
+          // Ignore workflow_start messages
+          console.log(`SummarizationAgent (${this.id}): Ignoring workflow_start message`);
           break;
         case 'system':
           if (message.content === 'shutdown') {
@@ -54,57 +51,41 @@ export class SummarizationAgent extends BaseAgent<SummarizationAgentState> {
           }
           break;
         default:
-          throw new Error(`Unsupported message type: ${message.type}`);
+          console.log(`SummarizationAgent (${this.id}): Ignoring message of type ${message.type}`);
       }
-
-      this.updateState({ status: 'idle' });
     } catch (error) {
-      await this.handleError(error instanceof Error ? error : new Error(String(error)));
+      await this.handleError(error);
     }
   }
 
-  private async handleSummarization(message: Message): Promise<void> {
+  private async handleSummarizeRequest(message: Message): Promise<void> {
     try {
-      console.log(`SummarizationAgent (${this.id}): Processing summarization request`);
-
-      this.updateState({
+      const content = typeof message.content === 'string' ? message.content : message.content.text;
+      console.log(`SummarizationAgent (${this.id}): Processing summarize request`);
+      
+      this.updateState({ 
         status: 'processing',
-        lastInput: message.content,
-        summary: undefined,
-        lastError: undefined,
-      });
+        lastMessage: message 
+      } as Partial<SummarizationAgentState>);
 
-      const summary = await this.generateSummary(message.content);
+      // Process the content and get summary
+      const summary = await this.summarize(content);
 
-      this.updateState({
-        status: 'success',
-        summary,
-        lastError: undefined,
-      });
-
+      // Send back the response
       await this.sendMessage({
-        type: 'response',
+        type: 'summarize_response',
         content: summary,
         metadata: {
           ...message.metadata,
-          source: this.id,
-          target: 'chatbot',
-          requiresSummarization: false, // Mark as not requiring further summarization
-          timestamp: Date.now(),
-        },
+          source: this.type,
+          target: message.metadata.source,
+          timestamp: Date.now()
+        }
       });
+
+      this.updateState({ status: 'idle' } as Partial<SummarizationAgentState>);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`Error in summarization (${this.id}):`, errorMessage);
-      this.updateState({
-        status: 'error',
-        lastError: {
-          code: 'SUMMARIZATION_ERROR',
-          message: errorMessage,
-          timestamp: Date.now(),
-        },
-      });
-      throw error;
+      await this.handleError(error);
     }
   }
 
@@ -134,6 +115,34 @@ export class SummarizationAgent extends BaseAgent<SummarizationAgentState> {
       }
 
       const prompt = `Please provide a clear and concise summary of the following information:\n\n${inputText}\n\nSummary:`;
+
+      const response = await this.openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a helpful AI assistant that creates clear, accurate, and concise summaries of information.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+      });
+
+      return response.choices[0]?.message?.content || 'No summary generated';
+    } catch (error) {
+      console.error(`Error generating summary (${this.id}):`, error);
+      throw error;
+    }
+  }
+
+  private async summarize(content: string): Promise<string> {
+    try {
+      const prompt = `Please provide a clear and concise summary of the following information:\n\n${content}\n\nSummary:`;
 
       const response = await this.openai.chat.completions.create({
         model: 'gpt-4',

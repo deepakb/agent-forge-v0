@@ -56,40 +56,67 @@ Content: ${result.content}`)
    - Maintain objectivity
    - Use formal language
 
-3. Citations:
-   - Add citations using [1], [2], etc.
-   - Include a References section at the end
-   - Link citations to the provided source URLs
-   - Add citations after key facts and claims
+3. Citations (VERY IMPORTANT):
+   - EVERY fact or claim must have a citation
+   - Use numbered citations like [1], [2], etc.
+   - Citations should appear immediately after the fact they support
+   - Each source can be cited multiple times
+   - Include a "## References" section at the end listing all sources
+   - Format references as:
+     [1] Title - URL
+     [2] Title - URL
+     etc.
 
 4. Formatting:
    - Use Markdown formatting
    - Use bullet points or numbered lists where appropriate
-   - Include relevant section headings like:
-     * Overview/Introduction
-     * History
-     * Technical details/Technology
-     * Applications/Uses
-     * Impact/Significance
-     * Future developments
-     * See also
-     * References
+   - Include these sections in order:
+     1. Introduction (no heading)
+     2. Table of Contents
+     3. Main content sections
+     4. See Also
+     5. References
 
-5. Special Elements:
-   - Add a "See also" section with related topics
-   - Include any relevant notes or external links
+5. Example Citation Format:
+   "React uses a virtual DOM to efficiently update the UI [1]. This approach, combined with its component-based architecture [2], makes it highly performant for complex web applications [1]."
 
 Here are the search results to use as sources:
 
 ${contentForSynthesis}
 
-Write the article now, ensuring proper citation of sources and Wikipedia-style formatting.`;
+Write the article now, ensuring EVERY fact has a citation and all sources are properly referenced at the end.`;
+
+      this.logger.info('Starting article synthesis', {
+        agentId: this.getId(),
+        promptLength: prompt.length,
+        sourceCount: searchResults.length,
+      });
 
       const article = await this.openai.complete(prompt);
+
+      // Verify citations are present
+      const hasCitations = /\[\d+\]/.test(article);
+      const hasReferences = /## References/.test(article);
 
       this.logger.info('Article synthesis completed', {
         agentId: this.getId(),
         articleLength: article.length,
+        hasCitations,
+        hasReferences,
+      });
+
+      if (!hasCitations || !hasReferences) {
+        this.logger.warn('Article may be missing citations or references', {
+          agentId: this.getId(),
+          hasCitations,
+          hasReferences,
+        });
+      }
+
+      // Emit completion event first
+      this.completionEmitter.emit('synthesisComplete', { 
+        content: article, 
+        sources: searchResults.map(result => result.url) 
       });
 
       const nextMessage: AgentMessage = {
@@ -99,13 +126,12 @@ Write the article now, ensuring proper citation of sources and Wikipedia-style f
         data: article,
       };
 
-      await this.publishMessage(nextMessage);
-
-      // Emit completion event
-      this.completionEmitter.emit('synthesisComplete', { 
-        content: article, 
-        sources: searchResults.map(result => result.url) 
-      });
+      // Then publish message to workflow
+      try {
+        await this.publishMessage(nextMessage);
+      } catch (error) {
+        throw new Error(`Failed to publish article message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
 
       return {
         success: true,

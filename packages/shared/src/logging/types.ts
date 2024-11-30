@@ -1,6 +1,15 @@
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 export type LogStatus = 'success' | 'failure' | 'in_progress' | 'warning';
 
+export interface LoggerConfig {
+  logDir?: string;
+  maxSize?: string;
+  maxFiles?: string;
+  level?: LogLevel;
+  enableConsole?: boolean;
+  rotationFormat?: string;
+}
+
 export interface LogContext {
   component?: string;
   operation?: string;
