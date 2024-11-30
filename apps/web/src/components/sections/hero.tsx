@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Container } from "@/components/ui/container"
+
 import { ProductCarousel } from "./product-carousel"
 
 const enterpriseFeatures = [

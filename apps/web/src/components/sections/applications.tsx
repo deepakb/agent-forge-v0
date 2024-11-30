@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
+import { useState } from 'react'
 
 import { Container } from '@/components/ui/container'
+
 import { ApplicationModal } from './application-modal'
 
 type Application = {
