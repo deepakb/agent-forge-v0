@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Container } from '@/components/ui/container'
+import { Logo } from '@/components/ui/logo'
 
 const navigation = {
   product: [
@@ -71,10 +72,11 @@ export function Footer() {
       </h2>
       <Container>
         <div className="py-12 xl:py-16">
-          <div className="xl:grid xl:grid-cols-3 xl:gap-8">
+          <div className="xl:grid xl:grid-cols-4 xl:gap-8">
             <div className="space-y-8">
-              <Link href="/" className="text-white font-bold text-xl">
-                Agent Forge
+              <Link href="/" className="flex items-center gap-3 text-white">
+                <Logo className="[&>div>img]:w-10 [&>div>img]:h-10" />
+                <span className="font-bold text-xl">Agent Forge</span>
               </Link>
               <p className="text-sm leading-6">
                 Building the future of AI agent systems for enterprise.
@@ -92,7 +94,7 @@ export function Footer() {
                 ))}
               </div>
             </div>
-            <div className="mt-16 grid grid-cols-2 gap-8 xl:col-span-2 xl:mt-0">
+            <div className="mt-16 grid grid-cols-2 gap-8 xl:col-span-3 xl:mt-0">
               <div className="md:grid md:grid-cols-2 md:gap-8">
                 <div>
                   <h3 className="text-sm font-semibold leading-6 text-white">Product</h3>
@@ -148,7 +150,7 @@ export function Footer() {
             </div>
           </div>
           <div className="mt-8 border-t border-gray-800 pt-8">
-            <p className="text-xs leading-5">
+            <p className="text-xs leading-5 text-gray-400">
               &copy; {new Date().getFullYear()} Agent Forge. All rights reserved.
             </p>
           </div>

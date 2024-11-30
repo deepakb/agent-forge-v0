@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Container } from '@/components/ui/container'
+import { Logo } from '@/components/ui/logo'
 
 const navigation = [
   { name: 'Features', href: '#features' },
@@ -39,8 +40,9 @@ export function Header() {
           <div className="flex lg:flex-1">
             <Link
               href="/"
-              className="font-bold text-xl text-gray-900 hover:text-blue-600 transition-colors"
+              className="flex items-center gap-3 font-bold text-lg text-gray-900 hover:text-blue-600 transition-colors"
             >
+              <Logo />
               Agent Forge
             </Link>
           </div>
