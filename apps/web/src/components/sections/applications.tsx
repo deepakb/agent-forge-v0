@@ -1,11 +1,27 @@
 'use client'
 
-import { Container } from '@/components/ui/container'
-import Link from 'next/link'
 import { useState } from 'react'
+import Link from 'next/link'
+
+import { Container } from '@/components/ui/container'
 import { ApplicationModal } from './application-modal'
 
-const applications = [
+type Application = {
+  title: string
+  price: string
+  shortDescription: string
+  description: string
+  metrics: Record<string, string>
+  features: string[]
+  includes: string[]
+  packageName: string
+  demoUrl: string
+  docsUrl: string
+  status: string
+  icon: JSX.Element
+}
+
+const applications: Application[] = [
   {
     title: 'Enterprise Support Hub',
     price: '$499',
@@ -219,7 +235,18 @@ const applications = [
 ]
 
 export function ApplicationsSection() {
-  const [selectedApp, setSelectedApp] = useState(null)
+  const [selectedApp, setSelectedApp] = useState<Application | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  const handleAppClick = (app: Application) => {
+    setSelectedApp(app)
+    setIsModalOpen(true)
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setSelectedApp(null)
+  }
 
   return (
     <section className="relative py-24 overflow-hidden bg-gradient-to-b from-gray-50 to-white" id="solutions">
@@ -245,7 +272,7 @@ export function ApplicationsSection() {
             <div
               key={app.title}
               className="group bg-white rounded-xl border border-gray-100 hover:border-blue-500/20 hover:shadow-xl transition-all duration-300 cursor-pointer relative flex flex-col"
-              onClick={() => setSelectedApp(app)}
+              onClick={() => handleAppClick(app)}
             >
               {/* Hover gradient effect */}
               <div className="absolute inset-0 bg-gradient-to-b from-blue-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
@@ -338,7 +365,8 @@ export function ApplicationsSection() {
       {selectedApp && (
         <ApplicationModal
           application={selectedApp}
-          onClose={() => setSelectedApp(null)}
+          onClose={handleCloseModal}
+          isOpen={isModalOpen}
         />
       )}
     </section>

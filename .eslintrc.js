@@ -5,7 +5,8 @@ module.exports = {
     project: [
       './tsconfig.json',
       './packages/*/tsconfig.json',
-      './apps/examples/*/tsconfig.json'
+      './apps/examples/*/tsconfig.json',
+      './apps/web/tsconfig.json'
     ],
     tsconfigRootDir: __dirname,
   },
@@ -22,7 +23,7 @@ module.exports = {
     },
     'import/resolver': {
       typescript: {
-        project: ['./tsconfig.json', './packages/*/tsconfig.json'],
+        project: ['./tsconfig.json', './packages/*/tsconfig.json', './apps/web/tsconfig.json'],
         alwaysTryTypes: true,
       },
       node: {
