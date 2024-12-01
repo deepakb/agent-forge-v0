@@ -29,6 +29,8 @@
   "dependencies": {
     "@agent-forge/core": "workspace:*",
     "@agent-forge/shared": "workspace:*",
+    "@anthropic-ai/sdk": "^0.17.1",
+    "gpt-3-encoder": "^1.1.4",
     "openai": "^4.28.0",
     "zod": "^3.23.8"
   },

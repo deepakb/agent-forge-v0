@@ -1,10 +1,5 @@
-export interface LLMConfig {
-  apiKey: string;
-  modelName?: string;
-  organizationId?: string;
-  temperature?: number;
-  maxTokens?: number;
-}
+import { z } from 'zod';
+import { BaseProviderConfig } from '../config/validation';
 
 export interface LLMResponse {
   text: string;
@@ -17,8 +12,18 @@ export interface LLMResponse {
 }
 
 export interface LLMProvider {
-  initialize(config: LLMConfig): void;
-  complete(prompt: string, options?: Partial<LLMConfig>): Promise<LLMResponse>;
-  stream(prompt: string, options?: Partial<LLMConfig>): AsyncGenerator<string, void, unknown>;
+  initialize(config: BaseProviderConfig): Promise<void>;
+  complete(prompt: string, options?: Partial<BaseProviderConfig>): Promise<LLMResponse>;
+  stream(prompt: string, options?: Partial<BaseProviderConfig>): AsyncGenerator<string, void, unknown>;
   embedText(text: string): Promise<number[]>;
 }
+
+export const LLMResponseSchema = z.object({
+  text: z.string(),
+  usage: z.object({
+    promptTokens: z.number(),
+    completionTokens: z.number(),
+    totalTokens: z.number(),
+  }).optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
