@@ -28,7 +28,6 @@
   "dependencies": {
     "@agent-forge/shared": "workspace:*",
     "eventemitter3": "^5.0.1",
-    "ioredis": "^5.3.2",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",
     "zod": "^3.23.8"

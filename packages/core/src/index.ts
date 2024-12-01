@@ -1,14 +1,16 @@
-// Export all types
+// Export types
 export * from './types';
 
-// Export agent module
-export * from './agent';
-
-// Export communication module
-export * from './communication';
-
-// Export state management module
+// Export state management
 export * from './state-management';
 
-// Export workflow module
-export * from './workflow';
+// Export storage system
+export * from './storage';
+
+// Export communication interfaces and implementations
+export {
+  MessageRouter,
+  DefaultMessageRouter,
+  MessageSerializer,
+  DefaultMessageSerializer,
+} from './communication';
