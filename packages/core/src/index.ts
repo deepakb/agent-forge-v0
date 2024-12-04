@@ -1,3 +1,6 @@
+import 'reflect-metadata';
+import { container } from './container/container';
+
 // Export types
 export * from './types';
 
@@ -14,3 +17,5 @@ export {
   MessageSerializer,
   DefaultMessageSerializer,
 } from './communication';
+
+export { container };
