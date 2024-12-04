@@ -4,21 +4,66 @@ Core functionality for Agent Forge, providing a flexible and extensible framewor
 
 ## Features
 
-- Flexible state management
-- Pluggable storage system
-- Event-driven architecture
-- Type-safe interfaces
+### Agent Management
+- Base agent implementation with extensible architecture
+- Agent state management and lifecycle control
+- Configurable agent behaviors and capabilities
+
+### Workflow Orchestration
+- Workflow definition and execution
+- Task scheduling and management
+- State transitions and error handling
+- Event-driven workflow control
+
+### State Management
+- Flexible state store implementation
+- Pluggable storage adapters
 - Transaction support
+- State persistence and recovery
+
+### Communication System
+- Message broker for inter-agent communication
+- Message routing and handling
+- Serialization and deserialization of messages
+- Event-driven architecture
+
+### Container Management
+- Dependency injection container
+- Service registration and resolution
+- Modular architecture support
 
 ## Installation
 
 ```bash
+npm install @agent-forge/core
+# or
+yarn add @agent-forge/core
+# or
 pnpm add @agent-forge/core
 ```
 
 ## Usage
 
-### Basic Usage with Default Memory Storage
+### Creating an Agent
+
+```typescript
+import { BaseAgent, ConfigurableStateStore } from '@agent-forge/core';
+
+class MyCustomAgent extends BaseAgent {
+  async initialize() {
+    // Custom initialization logic
+  }
+
+  async execute() {
+    // Custom execution logic
+  }
+}
+
+const agent = new MyCustomAgent('agent-1');
+await agent.initialize();
+```
+
+### Managing State
 
 ```typescript
 import { ConfigurableStateStore, createDefaultStorage } from '@agent-forge/core';
@@ -26,138 +71,70 @@ import { ConfigurableStateStore, createDefaultStorage } from '@agent-forge/core'
 // Create a store with default memory storage
 const store = new ConfigurableStateStore(createDefaultStorage());
 
-// Use the store
+// Update agent state
 await store.updateAgentState('agent1', { status: 'running' });
+
+// Retrieve agent state
 const state = await store.getAgentState('agent1');
 ```
 
-### Using Custom Storage Adapters
-
-You can implement your own storage adapter for any database or storage system:
+### Working with Workflows
 
 ```typescript
-import { StorageAdapter, ConfigurableStateStore } from '@agent-forge/core';
-import { MongoClient } from 'mongodb';
+import { WorkflowOrchestrator } from '@agent-forge/core';
 
-class MongoDBAdapter implements StorageAdapter {
-    constructor(private client: MongoClient, private collection: string) {}
+const workflow = new WorkflowOrchestrator();
 
-    async get(key: string): Promise<any> {
-        const doc = await this.client
-            .collection(this.collection)
-            .findOne({ _id: key });
-        return doc?.value;
-    }
-
-    async set(key: string, value: any): Promise<void> {
-        await this.client
-            .collection(this.collection)
-            .updateOne(
-                { _id: key },
-                { $set: { value } },
-                { upsert: true }
-            );
-    }
-
-    // Implement other methods...
-}
-
-// Use MongoDB adapter
-const mongoClient = new MongoClient('mongodb://localhost:27017');
-const mongoAdapter = new MongoDBAdapter(mongoClient, 'states');
-const store = new ConfigurableStateStore(mongoAdapter);
-```
-
-### Using the Storage Factory
-
-The storage factory provides a convenient way to create storage adapters:
-
-```typescript
-import { StorageFactory, ConfigurableStateStore } from '@agent-forge/core';
-
-// Register a custom adapter
-class PostgresAdapter implements StorageAdapter {
-    // Implementation...
-}
-StorageFactory.register('postgres', PostgresAdapter);
-
-// Create storage using factory
-const storage = await StorageFactory.createStorage({
-    type: 'postgres',
-    options: {
-        connectionString: 'postgresql://localhost:5432/mydb'
-    }
+// Define workflow steps
+workflow.addStep({
+  id: 'step1',
+  execute: async (context) => {
+    // Step execution logic
+  }
 });
 
-const store = new ConfigurableStateStore(storage);
+// Execute workflow
+await workflow.execute();
 ```
 
-### Transaction Support
-
-The state store supports transactions when the underlying storage adapter implements them:
+### Message Communication
 
 ```typescript
-const store = new ConfigurableStateStore(storage);
+import { MessageBroker, MessageRouter } from '@agent-forge/core';
 
-await store.beginTransaction();
-try {
-    await store.updateAgentState('agent1', { status: 'running' });
-    await store.updateTaskState('task1', { progress: 50 });
-    await store.commitTransaction();
-} catch (error) {
-    await store.rollbackTransaction();
-    throw error;
-}
-```
+const broker = new MessageBroker();
+const router = new MessageRouter();
 
-### Event Handling
-
-The state store emits events for state changes:
-
-```typescript
-store.on('AGENT_STATE_CHANGED', async (event) => {
-    console.log('Agent state changed:', {
-        agentId: event.entityId,
-        previousState: event.previousState,
-        currentState: event.currentState
-    });
+// Subscribe to messages
+broker.subscribe('topic', (message) => {
+  // Handle message
 });
+
+// Send messages
+broker.publish('topic', { data: 'Hello!' });
 ```
 
-## Advanced Features
+## API Reference
 
-### Query Support
+### BaseAgent
+The foundation class for creating custom agents.
 
-If your storage adapter implements query support:
+### ConfigurableStateStore
+Manages state persistence and retrieval.
 
-```typescript
-const tasks = await store.listTasks({
-    filter: { status: 'pending' }
-});
-```
+### WorkflowOrchestrator
+Handles workflow definition and execution.
 
-### Batch Operations
+### MessageBroker
+Facilitates message-based communication.
 
-For storage adapters that implement batch operations:
-
-```typescript
-if ('batchSet' in storage) {
-    const entries = new Map([
-        ['agent:1', { status: 'running' }],
-        ['agent:2', { status: 'idle' }]
-    ]);
-    await storage.batchSet(entries);
-}
-```
+### StorageAdapter
+Interface for implementing custom storage solutions.
 
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+Please read our [Contributing Guide](../CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
