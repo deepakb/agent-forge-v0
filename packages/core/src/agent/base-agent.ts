@@ -20,6 +20,7 @@ export abstract class BaseAgent implements AgentLifecycle {
   protected isRunning: boolean;
   protected currentTasks: Map<string, Task>;
   protected messageHandlers: Map<string, MessageHandler>;
+  private readonly logger: Logger;
 
   constructor(config: Partial<AgentConfig> = {}) {
     this.id = config.id || uuidv4();
@@ -27,6 +28,7 @@ export abstract class BaseAgent implements AgentLifecycle {
     this.isRunning = false;
     this.currentTasks = new Map();
     this.messageHandlers = new Map();
+    this.logger = new Logger();
 
     this.config = {
       id: this.id,
@@ -153,7 +155,7 @@ export abstract class BaseAgent implements AgentLifecycle {
     const interval = setInterval(() => {
       this.metadata.lastHeartbeat = new Date();
       this.emitStateChange().catch(error => {
-        Logger.error('Failed to emit heartbeat', { error, agentId: this.id });
+        this.logger.error('Failed to emit heartbeat', error, { agentId: this.id });
       });
     }, 30000); // Every 30 seconds
 

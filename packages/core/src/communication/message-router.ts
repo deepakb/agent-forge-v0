@@ -27,17 +27,18 @@ export interface MessageRouter {
 
 export class DefaultMessageRouter implements MessageRouter {
   private readonly events: EventEmitter;
+  private readonly logger: Logger;
 
   constructor() {
     this.events = new EventEmitter();
+    this.logger = new Logger();
   }
 
   async route(message: unknown): Promise<void> {
     try {
       this.events.emit('message', message);
     } catch (error) {
-      Logger.error('Error routing message', { 
-        error: error instanceof Error ? error.message : 'Unknown error',
+      this.logger.error('Error routing message', error instanceof Error ? error : new Error('Unknown error'), {
         message: JSON.stringify(message)
       });
       throw error;
