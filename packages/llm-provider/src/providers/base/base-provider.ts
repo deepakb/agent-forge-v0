@@ -1,134 +1,41 @@
-import { Logger } from '@agent-forge/shared';
-import { BaseProviderConfig } from '../../config/validation';
-import { LLMProviderError, LLMRateLimitError, LLMTimeoutError } from '../../errors/provider-errors';
-import { RateLimiter } from '../../utils/rate-limiting';
-import { TokenCounter } from '../../utils/token-counter';
+import { ILogger, IErrorHandler } from '@agent-forge/shared';
+import { Message, LLMResponse, StreamingOptions, ProviderConfig } from '../../types/provider';
+import { ILLMProvider } from '../../container/interfaces';
+import { LLMProviderError } from '../../errors/provider-errors';
 
-export interface LLMResponse {
-  text: string;
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
-  metadata?: {
-    model?: string;
-    provider?: string;
-    stopReason?: string | null;
-    stopSequence?: string | null;
-    [key: string]: any;
-  };
-}
+export abstract class BaseLLMProvider implements ILLMProvider {
+    protected initialized: boolean = false;
+    protected abstract config: ProviderConfig;
+    
+    constructor(
+        protected readonly logger: ILogger,
+        protected readonly errorHandler: IErrorHandler
+    ) {}
 
-interface RetryOptions {
-  operation: string;
-  maxRetries?: number;
-  retryDelay?: number;
-}
+    abstract initialize(config: ProviderConfig): Promise<void>;
+    abstract validateConfig(config: ProviderConfig): boolean;
+    abstract complete(messages: Message[], options?: StreamingOptions): Promise<LLMResponse>;
+    abstract stream(messages: Message[], options?: StreamingOptions): AsyncGenerator<string, void, unknown>;
+    abstract getProviderName(): string;
 
-export abstract class BaseLLMProvider {
-  protected config!: BaseProviderConfig;
-  protected rateLimiter: RateLimiter;
-  protected tokenCounter: TokenCounter;
-  private readonly loggerContext = { logger: 'LLMProvider' };
-
-  constructor() {
-    this.rateLimiter = new RateLimiter();
-    this.tokenCounter = new TokenCounter();
-  }
-
-  async initialize(config: BaseProviderConfig): Promise<void> {
-    this.config = config;
-    this.rateLimiter.configure(config);
-    this.tokenCounter.configure(config);
-  }
-
-  abstract complete(prompt: string, options?: Partial<BaseProviderConfig>): Promise<LLMResponse>;
-  abstract stream(prompt: string, options?: Partial<BaseProviderConfig>): AsyncGenerator<string, void, unknown>;
-  abstract embedText(text: string): Promise<number[]>;
-
-  protected async logOperation<T>(operation: string, fn: () => Promise<T>): Promise<T> {
-    const startTime = Date.now();
-    try {
-      const result = await fn();
-      await Logger.info(`${operation} completed successfully`, {
-        ...this.loggerContext,
-        duration: Date.now() - startTime,
-      });
-      return result;
-    } catch (error) {
-      await Logger.error(`${operation} failed`, {
-        ...this.loggerContext,
-        error,
-        duration: Date.now() - startTime,
-      });
-      throw error;
-    }
-  }
-
-  protected async withRetry<T>(
-    fn: () => Promise<T>,
-    options: RetryOptions
-  ): Promise<T> {
-    const { operation, maxRetries = 3, retryDelay = 1000 } = options;
-    let lastError: Error | undefined;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        return await fn();
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-
-        if (this.shouldRetry(lastError) && attempt < maxRetries) {
-          await Logger.warn(`${operation} failed, retrying (${attempt}/${maxRetries})`, {
-            ...this.loggerContext,
-            error: lastError,
-          });
-          await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
-          continue;
+    protected ensureInitialized(): void {
+        if (!this.initialized) {
+            throw new LLMProviderError('Provider not initialized');
         }
-
-        throw this.mapError(lastError);
-      }
     }
 
-    throw lastError;
-  }
-
-  private shouldRetry(error: Error): boolean {
-    const retryableErrors = [
-      'timeout',
-      'rate limit',
-      'too many requests',
-      '429',
-      '500',
-      '502',
-      '503',
-      '504',
-    ];
-
-    const errorString = error.message.toLowerCase();
-    return retryableErrors.some(e => errorString.includes(e));
-  }
-
-  private mapError(error: Error): Error {
-    const errorString = error.message.toLowerCase();
-    
-    if (errorString.includes('rate limit') || errorString.includes('429')) {
-      return new LLMRateLimitError('Rate limit exceeded', { cause: error });
-    }
-    
-    if (errorString.includes('timeout')) {
-      return new LLMTimeoutError('Request timed out', { cause: error });
+    protected handleError(message: string, error: unknown): void {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.logger.error(`${message}: ${errorMessage}`);
+        
+        if (error instanceof Error) {
+            this.errorHandler.handleError(error);
+        } else {
+            this.errorHandler.handleError(new Error(errorMessage));
+        }
     }
 
-    return new LLMProviderError('Operation failed', { cause: error });
-  }
-
-  protected mergeConfig(options?: Partial<BaseProviderConfig>): BaseProviderConfig {
-    return {
-      ...this.config,
-      ...options,
-    };
-  }
+    isInitialized(): boolean {
+        return this.initialized;
+    }
 }

@@ -1,19 +1,25 @@
-// Export base types and interfaces
-export type { LLMResponse } from './providers/base/base-provider';
-export * from './types/provider';
+// Initialize container
+import 'reflect-metadata';
 
-// Export configuration types and utilities
-export * from './config/validation';
-export * from './config/defaults';
+// IoC exports
+export { container } from './container/container';
+export { LLM_PROVIDER_TYPES } from './container/types';
+export * from './container/interfaces';
 
-// Export error types
+// Provider implementations
+export { AnthropicProvider } from './providers/anthropic/anthropic-provider';
+export { OpenAIProvider } from './providers/openai/openai-provider';
+export { LLMProviderFactory } from './providers/provider-factory';
+
+// Types and configurations
+export type {
+    Message,
+    StreamingOptions,
+    ProviderConfig,
+    LLMResponse,
+    ProviderType
+} from './types/provider';
+export { SUPPORTED_PROVIDERS } from './types/provider';
+
+// Errors
 export * from './errors/provider-errors';
-
-// Export utility classes
-export * from './utils/rate-limiting';
-export * from './utils/token-counter';
-
-// Export provider implementations
-export * from './providers/base/base-provider';
-export * from './providers/openai/openai-provider';
-export * from './providers/anthropic/anthropic-provider';

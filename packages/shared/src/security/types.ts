@@ -5,7 +5,7 @@ export type { LoggerConfig };
 export interface SecurityContext {
   agentId?: string;
   operation: string;
-  timestamp: Date;
+  timestamp: string | number | Date;
   metadata?: Record<string, unknown>;
 }
 
@@ -24,7 +24,10 @@ export interface SecurityConfig {
 export interface SecureMessage {
   id: string;
   encrypted: boolean;
-  content: string | Record<string, unknown>;
-  signature?: string;
-  timestamp: string;  // ISO string format
+  content: {
+    ciphertext?: string;
+    signature?: string;
+    plaintext?: Record<string, unknown>;
+    timestamp: Date;
+  };
 }

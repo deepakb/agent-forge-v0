@@ -1,123 +1,126 @@
+import { injectable, inject } from 'inversify';
 import Anthropic from '@anthropic-ai/sdk';
-import { Logger } from '@agent-forge/shared';
-import { BaseLLMProvider, LLMResponse } from '../base/base-provider';
-import { AnthropicConfig } from '../../config/validation';
-import { DEFAULT_ANTHROPIC_CONFIG } from '../../config/defaults';
-import { LLMAuthenticationError, LLMProviderError, LLMValidationError } from '../../errors/provider-errors';
+import { ILogger, IErrorHandler } from '@agent-forge/shared';
+import { LLM_PROVIDER_TYPES } from '../../container/types';
+import { ILLMProvider, IAnthropicConfig } from '../../container/interfaces';
+import { Message, LLMResponse, StreamingOptions, ProviderConfig } from '../../types/provider';
+import { BaseLLMProvider } from '../base/base-provider';
+import { LLMConfigurationError } from '../../errors/provider-errors';
 
-export class AnthropicProvider extends BaseLLMProvider {
-  private client!: Anthropic;
+type AnthropicRole = 'user' | 'assistant';
 
-  async initialize(config: AnthropicConfig): Promise<void> {
-    try {
-      await super.initialize(config);
+@injectable()
+export class AnthropicProvider extends BaseLLMProvider implements ILLMProvider {
+    private client: Anthropic | null = null;
+    protected config!: IAnthropicConfig;
 
-      this.client = new Anthropic({
-        apiKey: config.apiKey,
-      });
-
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.message.includes('auth') || error.message.includes('key')) {
-          throw new LLMAuthenticationError('Authentication failed with Anthropic API', { originalError: error });
-        }
-        throw new LLMProviderError('Failed to initialize Anthropic client', { originalError: error });
-      }
-      throw error;
+    constructor(
+        @inject(LLM_PROVIDER_TYPES.Logger) logger: ILogger,
+        @inject(LLM_PROVIDER_TYPES.ErrorHandler) errorHandler: IErrorHandler
+    ) {
+        super(logger, errorHandler);
     }
-  }
 
-  async complete(prompt: string, options?: Partial<AnthropicConfig>): Promise<LLMResponse> {
-    await this.tokenCounter.validateTokenCount(prompt);
+    async initialize(config: ProviderConfig): Promise<void> {
+        if (!this.validateConfig(config)) {
+            throw new LLMConfigurationError('Invalid Anthropic configuration');
+        }
 
-    return this.logOperation('completion', async () => {
-      await this.rateLimiter.acquire();
-      try {
-        const config = this.mergeConfig(options);
-        const response = await this.withRetry(
-          () =>
-            this.client.messages.create({
-              model: config.modelName,
-              max_tokens: config.maxTokens,
-              temperature: config.temperature,
-              messages: [{ role: 'user', content: prompt }],
-            }),
-          { operation: 'completion' }
-        );
+        const anthropicConfig = config as IAnthropicConfig;
+        this.client = new Anthropic({
+            apiKey: anthropicConfig.anthropicApiKey
+        });
+        this.config = anthropicConfig;
+        this.initialized = true;
+    }
 
-        const content = response.content[0]?.text || '';
-        return {
-          text: content,
-          usage: {
-            promptTokens: 0, // Anthropic doesn't provide token counts yet
-            completionTokens: 0,
-            totalTokens: 0,
-          },
-          metadata: {
-            model: response.model,
-            provider: 'anthropic',
-            stopReason: response.stop_reason || null,
-            stopSequence: response.stop_sequence || null,
-          },
-        };
-      } finally {
-        this.rateLimiter.release();
-      }
-    });
-  }
+    validateConfig(config: ProviderConfig): boolean {
+        if (!config || config.provider !== 'anthropic') return false;
+        const anthropicConfig = config as IAnthropicConfig;
+        return !!anthropicConfig.anthropicApiKey;
+    }
 
-  async *stream(
-    prompt: string,
-    options?: Partial<AnthropicConfig>
-  ): AsyncGenerator<string, void, unknown> {
-    await this.tokenCounter.validateTokenCount(prompt);
+    private convertToAnthropicMessages(messages: Message[]): { role: AnthropicRole; content: string }[] {
+        return messages
+            .filter(msg => msg.role !== 'system')
+            .map(msg => ({
+                role: msg.role === 'user' ? 'user' : 'assistant' as AnthropicRole,
+                content: msg.content
+            }));
+    }
 
-    await this.rateLimiter.acquire();
-    try {
-      const config = this.mergeConfig(options);
-      const stream = await this.withRetry(
-        () =>
-          this.client.messages.create({
-            model: config.modelName,
-            max_tokens: config.maxTokens,
-            temperature: config.temperature,
-            messages: [{ role: 'user', content: prompt }],
-            stream: true,
-          }),
-        { operation: 'stream' }
-      );
+    private getSystemPrompt(messages: Message[]): string | undefined {
+        const systemMessage = messages.find(msg => msg.role === 'system');
+        return systemMessage?.content;
+    }
 
-      let totalTokens = 0;
-      for await (const chunk of stream) {
-        if ('content' in chunk && Array.isArray(chunk.content) && chunk.content.length > 0) {
-          const content = chunk.content[0]?.text || '';
-          if (content) {
-            totalTokens += await this.tokenCounter.countTokens(content);
-            if (totalTokens > config.maxTokens) {
-              throw new LLMValidationError('Stream exceeded maximum token limit', {
-                totalTokens,
-                maxTokens: config.maxTokens,
-              });
+    async complete(messages: Message[], options?: StreamingOptions): Promise<LLMResponse> {
+        this.ensureInitialized();
+        
+        try {
+            const systemPrompt = this.getSystemPrompt(messages);
+            const anthropicMessages = this.convertToAnthropicMessages(messages);
+
+            const response = await this.client!.messages.create({
+                model: this.config.modelName,
+                messages: anthropicMessages,
+                system: systemPrompt,
+                max_tokens: options?.maxTokens ?? 1024,
+                temperature: options?.temperature,
+                top_p: options?.topP,
+                stop_sequences: options?.stopSequences
+            });
+
+            return {
+                content: response.content[0].text,
+                model: response.model,
+                usage: {
+                    promptTokens: response.usage?.input_tokens,
+                    completionTokens: response.usage?.output_tokens,
+                    totalTokens: (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0)
+                },
+                metadata: {
+                    model: response.model,
+                    provider: 'anthropic',
+                    stopReason: response.stop_reason || null
+                }
+            };
+        } catch (error) {
+            this.handleError('Error completing messages with Anthropic', error);
+            throw error;
+        }
+    }
+
+    async *stream(messages: Message[], options?: StreamingOptions): AsyncGenerator<string, void, unknown> {
+        this.ensureInitialized();
+
+        try {
+            const systemPrompt = this.getSystemPrompt(messages);
+            const anthropicMessages = this.convertToAnthropicMessages(messages);
+
+            const stream = await this.client!.messages.create({
+                model: this.config.modelName,
+                messages: anthropicMessages,
+                system: systemPrompt,
+                max_tokens: options?.maxTokens ?? 1024,
+                temperature: options?.temperature,
+                top_p: options?.topP,
+                stop_sequences: options?.stopSequences,
+                stream: true
+            });
+
+            for await (const chunk of stream) {
+                if (chunk.type === 'content_block_delta' && chunk.delta?.text) {
+                    yield chunk.delta.text;
+                }
             }
-            yield content;
-          }
+        } catch (error) {
+            this.handleError('Error streaming messages with Anthropic', error);
+            throw error;
         }
-      }
-    } finally {
-      this.rateLimiter.release();
     }
-  }
 
-  // Note: Anthropic doesn't currently support embeddings through their API
-  async embedText(text: string): Promise<number[]> {
-    throw new LLMProviderError('Embeddings are not supported by Anthropic provider');
-  }
-
-  protected mergeConfig(options?: Partial<AnthropicConfig>): AnthropicConfig {
-    return {
-      ...DEFAULT_ANTHROPIC_CONFIG,
-      ...this.config,
-      ...options,
-    } as AnthropicConfig;
-  }
+    getProviderName(): string {
+        return 'anthropic';
+    }
 }

@@ -1,29 +1,78 @@
 import { z } from 'zod';
-import { BaseProviderConfig } from '../config/validation';
 
-export interface LLMResponse {
-  text: string;
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
-  metadata?: Record<string, unknown>;
+export type Role = 'system' | 'user' | 'assistant';
+
+export interface Message {
+    role: Role;
+    content: string;
 }
 
+export interface StreamingOptions {
+    enabled?: boolean;
+    onToken?: (token: string) => void;
+    maxTokens?: number;
+    temperature?: number;
+    topP?: number;
+    frequencyPenalty?: number;
+    presencePenalty?: number;
+    stopSequences?: string[];
+}
+
+export interface BaseProviderConfig {
+    provider: 'openai' | 'anthropic';
+    modelName: string;
+    maxTokens?: number;
+    temperature?: number;
+    topP?: number;
+    frequencyPenalty?: number;
+    presencePenalty?: number;
+    stopSequences?: string[];
+    timeout?: number;
+    retryCount?: number;
+    retryDelay?: number;
+}
+
+export type ProviderConfig = BaseProviderConfig;
+
+export interface LLMResponse {
+    content: string;
+    model?: string;
+    usage?: {
+        promptTokens?: number;
+        completionTokens?: number;
+        totalTokens?: number;
+    };
+    finishReason?: string;
+    metadata: {
+        model: string;
+        provider: string;
+        stopReason: string | null;
+    };
+}
+
+export type ProviderType = 'openai' | 'anthropic';
+
+export const SUPPORTED_PROVIDERS: ProviderType[] = ['openai', 'anthropic'];
+
 export interface LLMProvider {
-  initialize(config: BaseProviderConfig): Promise<void>;
-  complete(prompt: string, options?: Partial<BaseProviderConfig>): Promise<LLMResponse>;
-  stream(prompt: string, options?: Partial<BaseProviderConfig>): AsyncGenerator<string, void, unknown>;
+  initialize(config: ProviderConfig): Promise<void>;
+  complete(prompt: string | Message[], options?: Partial<ProviderConfig>): Promise<LLMResponse>;
+  stream(prompt: string | Message[], options?: Partial<ProviderConfig> & StreamingOptions): AsyncGenerator<string, void, unknown>;
   embedText(text: string): Promise<number[]>;
 }
 
 export const LLMResponseSchema = z.object({
-  text: z.string(),
+  content: z.string(),
+  model: z.string().optional(),
   usage: z.object({
-    promptTokens: z.number(),
-    completionTokens: z.number(),
-    totalTokens: z.number(),
+    promptTokens: z.number().optional(),
+    completionTokens: z.number().optional(),
+    totalTokens: z.number().optional(),
   }).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  finishReason: z.string().optional(),
+  metadata: z.object({
+    model: z.string(),
+    provider: z.string(),
+    stopReason: z.string().nullable(),
+  }),
 });

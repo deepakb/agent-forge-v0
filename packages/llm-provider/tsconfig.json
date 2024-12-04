@@ -13,7 +13,9 @@
       "@agent-forge/shared": ["../shared/src"],
       "@agent-forge/llm-provider": ["./src"]
     },
-    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   },
   "include": ["src/**/*.ts"],
   "exclude": ["**/*.test.ts", "**/*.spec.ts", "node_modules", "dist"],

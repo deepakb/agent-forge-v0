@@ -1,136 +1,115 @@
+import { injectable, inject } from 'inversify';
 import OpenAI from 'openai';
-import { Logger } from '@agent-forge/shared';
-import { BaseLLMProvider, LLMResponse } from '../base/base-provider';
-import { OpenAIConfig } from '../../config/validation';
-import { DEFAULT_OPENAI_CONFIG } from '../../config/defaults';
-import { LLMAuthenticationError, LLMProviderError, LLMValidationError } from '../../errors/provider-errors';
+import { ILogger, IErrorHandler } from '@agent-forge/shared';
+import { LLM_PROVIDER_TYPES } from '../../container/types';
+import { ILLMProvider, IOpenAIConfig } from '../../container/interfaces';
+import { Message, LLMResponse, StreamingOptions, ProviderConfig } from '../../types/provider';
+import { BaseLLMProvider } from '../base/base-provider';
+import { LLMConfigurationError } from '../../errors/provider-errors';
 
-export class OpenAIProvider extends BaseLLMProvider {
-  private client!: OpenAI;
+@injectable()
+export class OpenAIProvider extends BaseLLMProvider implements ILLMProvider {
+    private client: OpenAI | null = null;
+    protected config!: IOpenAIConfig;
 
-  async initialize(config: OpenAIConfig): Promise<void> {
-    try {
-      await super.initialize(config);
-
-      this.client = new OpenAI({
-        apiKey: config.apiKey,
-        organization: config.organizationId,
-      });
-
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.message.includes('auth') || error.message.includes('key')) {
-          throw new LLMAuthenticationError('Authentication failed with OpenAI API', { originalError: error });
-        }
-        throw new LLMProviderError('Failed to initialize OpenAI client', { originalError: error });
-      }
-      throw error;
+    constructor(
+        @inject(LLM_PROVIDER_TYPES.Logger) logger: ILogger,
+        @inject(LLM_PROVIDER_TYPES.ErrorHandler) errorHandler: IErrorHandler
+    ) {
+        super(logger, errorHandler);
     }
-  }
 
-  async complete(prompt: string, options?: Partial<OpenAIConfig>): Promise<LLMResponse> {
-    await this.tokenCounter.validateTokenCount(prompt);
+    async initialize(config: ProviderConfig): Promise<void> {
+        if (!this.validateConfig(config)) {
+            throw new LLMConfigurationError('Invalid OpenAI configuration');
+        }
 
-    return this.logOperation('completion', async () => {
-      await this.rateLimiter.acquire();
-      try {
-        const config = this.mergeConfig(options);
-        const response = await this.withRetry(
-          () =>
-            this.client.chat.completions.create({
-              model: config.modelName,
-              messages: [{ role: 'user', content: prompt }],
-              temperature: config.temperature,
-              max_tokens: config.maxTokens,
-            }),
-          { operation: 'completion' }
-        );
+        const openaiConfig = config as IOpenAIConfig;
+        this.client = new OpenAI({
+            apiKey: openaiConfig.openaiApiKey,
+            organization: openaiConfig.organizationId
+        });
+        this.config = openaiConfig;
+        this.initialized = true;
+    }
 
-        const content = response.choices[0]?.message?.content || '';
-        return {
-          text: content,
-          usage: {
-            promptTokens: response.usage?.prompt_tokens || 0,
-            completionTokens: response.usage?.completion_tokens || 0,
-            totalTokens: response.usage?.total_tokens || 0,
-          },
-          metadata: {
-            model: response.model,
-            provider: 'openai',
-            stopReason: response.choices[0]?.finish_reason || null,
-          },
-        };
-      } finally {
-        this.rateLimiter.release();
-      }
-    });
-  }
+    validateConfig(config: ProviderConfig): boolean {
+        if (!config || config.provider !== 'openai') return false;
+        const openaiConfig = config as IOpenAIConfig;
+        return !!openaiConfig.openaiApiKey;
+    }
 
-  async *stream(
-    prompt: string,
-    options?: Partial<OpenAIConfig>
-  ): AsyncGenerator<string, void, unknown> {
-    await this.tokenCounter.validateTokenCount(prompt);
-
-    await this.rateLimiter.acquire();
-    try {
-      const config = this.mergeConfig(options);
-      const stream = await this.withRetry(
-        () =>
-          this.client.chat.completions.create({
-            model: config.modelName,
-            messages: [{ role: 'user', content: prompt }],
-            temperature: config.temperature,
-            max_tokens: config.maxTokens,
-            stream: true,
-          }),
-        { operation: 'stream' }
-      );
-
-      let totalTokens = 0;
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || '';
-        if (content) {
-          totalTokens += await this.tokenCounter.countTokens(content);
-          if (totalTokens > config.maxTokens) {
-            throw new LLMValidationError('Stream exceeded maximum token limit', {
-              totalTokens,
-              maxTokens: config.maxTokens,
+    async complete(messages: Message[], options?: StreamingOptions): Promise<LLMResponse> {
+        this.ensureInitialized();
+        
+        try {
+            const response = await this.client!.chat.completions.create({
+                model: this.config.modelName,
+                messages: messages.map(msg => ({
+                    role: msg.role,
+                    content: msg.content
+                })),
+                max_tokens: options?.maxTokens,
+                temperature: options?.temperature,
+                top_p: options?.topP,
+                frequency_penalty: options?.frequencyPenalty,
+                presence_penalty: options?.presencePenalty,
+                stop: options?.stopSequences
             });
-          }
-          yield content;
+
+            return {
+                content: response.choices[0].message.content || '',
+                model: response.model,
+                finishReason: response.choices[0].finish_reason,
+                usage: {
+                    promptTokens: response.usage?.prompt_tokens,
+                    completionTokens: response.usage?.completion_tokens,
+                    totalTokens: response.usage?.total_tokens
+                },
+                metadata: {
+                    model: response.model,
+                    provider: 'openai',
+                    stopReason: response.choices[0].finish_reason || null
+                }
+            };
+        } catch (error) {
+            this.handleError('Error completing messages with OpenAI', error);
+            throw error;
         }
-      }
-    } finally {
-      this.rateLimiter.release();
     }
-  }
 
-  async embedText(text: string): Promise<number[]> {
-    return this.logOperation('embedding', async () => {
-      await this.rateLimiter.acquire();
-      try {
-        const response = await this.withRetry(
-          () =>
-            this.client.embeddings.create({
-              model: 'text-embedding-ada-002',
-              input: text,
-            }),
-          { operation: 'embedding' }
-        );
+    async *stream(messages: Message[], options?: StreamingOptions): AsyncGenerator<string, void, unknown> {
+        this.ensureInitialized();
 
-        return response.data[0].embedding;
-      } finally {
-        this.rateLimiter.release();
-      }
-    });
-  }
+        try {
+            const stream = await this.client!.chat.completions.create({
+                model: this.config.modelName,
+                messages: messages.map(msg => ({
+                    role: msg.role,
+                    content: msg.content
+                })),
+                max_tokens: options?.maxTokens,
+                temperature: options?.temperature,
+                top_p: options?.topP,
+                frequency_penalty: options?.frequencyPenalty,
+                presence_penalty: options?.presencePenalty,
+                stop: options?.stopSequences,
+                stream: true
+            });
 
-  protected mergeConfig(options?: Partial<OpenAIConfig>): OpenAIConfig {
-    return {
-      ...DEFAULT_OPENAI_CONFIG,
-      ...this.config,
-      ...options,
-    } as OpenAIConfig;
-  }
+            for await (const chunk of stream) {
+                const content = chunk.choices[0]?.delta?.content;
+                if (content) {
+                    yield content;
+                }
+            }
+        } catch (error) {
+            this.handleError('Error streaming messages with OpenAI', error);
+            throw error;
+        }
+    }
+
+    getProviderName(): string {
+        return 'openai';
+    }
 }
