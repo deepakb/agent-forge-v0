@@ -4,6 +4,9 @@ import { QueryAgent } from '../agents/query-agent';
 import { FetchAgent } from '../agents/fetch-agent';
 import { SynthesisAgent } from '../agents/synthesis-agent';
 import { LoggerService } from '../utils/logger';
+import { LoggerAdapter } from '../utils/logger-adapter';
+import { EncryptionAdapter } from '../utils/encryption-adapter';
+import { SecurityAdapter } from '../utils/security-adapter';
 import { SecurityManager } from '@agent-forge/shared';
 import crypto from 'crypto';
 import {
@@ -42,20 +45,22 @@ export class WorkflowRunner {
     this.emitter = new EventEmitter();
     this.logger = LoggerService.getInstance();
 
-    // Generate a secure encryption key
-    const encryptionKey = crypto.randomBytes(32).toString('hex');
-
-    // Initialize security
-    this.security = SecurityManager.getInstance({
-      encryption: {
-        messages: true,
-        state: true
-      },
-      audit: {
-        enabled: true,
-        level: 'detailed'
+    // Initialize security with adapters
+    this.security = new SecurityManager(
+      new LoggerAdapter(),
+      new EncryptionAdapter(),
+      new SecurityAdapter(),
+      {
+        encryption: {
+          messages: true,
+          state: true
+        },
+        audit: {
+          enabled: true,
+          level: 'detailed'
+        }
       }
-    });
+    );
 
     // Initialize agents with security config
     const baseConfig = {
@@ -68,7 +73,7 @@ export class WorkflowRunner {
       openaiApiKey,
       tavilyApiKey,
       logLevel,
-      encryptionKey,
+      encryptionKey: crypto.randomBytes(32).toString('hex'),
       securityConfig: {
         encryption: {
           messages: true,
@@ -219,7 +224,7 @@ export class WorkflowRunner {
           articleLength: (message.data as string).length,
         });
         this.emitter.emit('complete', message.data);
-        await this.security.logAgentAction({
+        this.logger.info('Workflow completed', {
           agentId: 'workflow-runner',
           operation: 'COMPLETE_WORKFLOW',
           timestamp: new Date(),

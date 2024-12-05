@@ -42,7 +42,8 @@
   },
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "apps/examples/*"
   ],
   "dependencies": {
     "bcryptjs": "^2.4.3",
