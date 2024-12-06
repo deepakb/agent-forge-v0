@@ -4,6 +4,7 @@ import { LLM_PROVIDER_TYPES } from './types';
 import { ILLMProvider, ILLMProviderFactory } from './interfaces';
 import { AnthropicProvider } from '../providers/anthropic/anthropic-provider';
 import { OpenAIProvider } from '../providers/openai/openai-provider';
+import { FalAIProvider } from '../providers/fal-ai/fal-ai-provider';
 import { LLMProviderFactory } from '../providers/provider-factory';
 
 const container = new Container();
@@ -15,6 +16,7 @@ container.bind<IErrorHandler>(LLM_PROVIDER_TYPES.ErrorHandler).to(ErrorHandler);
 // LLM Providers
 container.bind<ILLMProvider>(LLM_PROVIDER_TYPES.AnthropicProvider).to(AnthropicProvider);
 container.bind<ILLMProvider>(LLM_PROVIDER_TYPES.OpenAIProvider).to(OpenAIProvider);
+container.bind<ILLMProvider>(LLM_PROVIDER_TYPES.FalAIProvider).to(FalAIProvider);
 
 // Provider Factory
 container.bind<ILLMProviderFactory>(LLM_PROVIDER_TYPES.LLMProviderFactory).to(LLMProviderFactory);

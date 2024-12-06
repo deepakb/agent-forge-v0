@@ -13,10 +13,12 @@ export class LLMProviderFactory implements ILLMProviderFactory {
         @inject(LLM_PROVIDER_TYPES.Logger) private logger: ILogger,
         @inject(LLM_PROVIDER_TYPES.ErrorHandler) private errorHandler: IErrorHandler,
         @inject(LLM_PROVIDER_TYPES.AnthropicProvider) private anthropicProvider: ILLMProvider,
-        @inject(LLM_PROVIDER_TYPES.OpenAIProvider) private openaiProvider: ILLMProvider
+        @inject(LLM_PROVIDER_TYPES.OpenAIProvider) private openaiProvider: ILLMProvider,
+        @inject(LLM_PROVIDER_TYPES.FalAIProvider) private falaiProvider: ILLMProvider
     ) {
         this.providers.set('anthropic', anthropicProvider);
         this.providers.set('openai', openaiProvider);
+        this.providers.set('fal-ai', falaiProvider);
     }
 
     async createProvider(providerName: string, config: ProviderConfig): Promise<ILLMProvider> {
