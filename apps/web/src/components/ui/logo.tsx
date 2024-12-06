@@ -1,12 +1,15 @@
-import AgentForgeLogo from '@/../../public/logos/agent-forge.svg'
+import Image from 'next/image'
 
 export function Logo({ className = '' }: { className?: string }) {
   return (
     <div className={`relative flex items-center ${className}`}>
-      <img
+      <Image
         src="/logos/agent-forge.svg"
         alt="Agent Forge Logo"
-        className={`w-9 h-9`}
+        width={36}
+        height={36}
+        className="w-9 h-9"
+        priority
       />
     </div>
   )

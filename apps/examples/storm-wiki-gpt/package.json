@@ -13,9 +13,9 @@
     "test": "jest"
   },
   "dependencies": {
-    "@agent-forge/core": "^1.0.0",
-    "@agent-forge/llm-provider": "^1.0.0",
-    "@agent-forge/shared": "^1.0.0",
+    "@agent-forge/core": "workspace:*",
+    "@agent-forge/llm-provider": "workspace:*",
+    "@agent-forge/shared": "workspace:*",
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
     "crypto-js": "^4.2.0",

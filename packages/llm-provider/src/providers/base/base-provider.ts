@@ -1,32 +1,41 @@
-import { LLMConfig, LLMResponse } from '../../types/provider';
+import { ILogger, IErrorHandler } from '@agent-forge/shared';
+import { Message, LLMResponse, StreamingOptions, ProviderConfig } from '../../types/provider';
+import { ILLMProvider } from '../../container/interfaces';
+import { LLMProviderError } from '../../errors/provider-errors';
 
-export abstract class BaseLLMProvider {
-  protected config!: LLMConfig;
+export abstract class BaseLLMProvider implements ILLMProvider {
+    protected initialized: boolean = false;
+    protected abstract config: ProviderConfig;
+    
+    constructor(
+        protected readonly logger: ILogger,
+        protected readonly errorHandler: IErrorHandler
+    ) {}
 
-  constructor() {
-    this.config = {
-      apiKey: '',
-      modelName: 'gpt-3.5-turbo',
-      maxTokens: 2048,
-      temperature: 0.7,
-    };
-  }
+    abstract initialize(config: ProviderConfig): Promise<void>;
+    abstract validateConfig(config: ProviderConfig): boolean;
+    abstract complete(messages: Message[], options?: StreamingOptions): Promise<LLMResponse>;
+    abstract stream(messages: Message[], options?: StreamingOptions): AsyncGenerator<string, void, unknown>;
+    abstract getProviderName(): string;
 
-  initialize(config: LLMConfig): void {
-    this.config = config;
-  }
+    protected ensureInitialized(): void {
+        if (!this.initialized) {
+            throw new LLMProviderError('Provider not initialized');
+        }
+    }
 
-  abstract complete(prompt: string, options?: Partial<LLMConfig>): Promise<LLMResponse>;
-  abstract stream(
-    prompt: string,
-    options?: Partial<LLMConfig>
-  ): AsyncGenerator<string, void, unknown>;
-  abstract embedText(text: string): Promise<number[]>;
+    protected handleError(message: string, error: unknown): void {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.logger.error(`${message}: ${errorMessage}`);
+        
+        if (error instanceof Error) {
+            this.errorHandler.handleError(error);
+        } else {
+            this.errorHandler.handleError(new Error(errorMessage));
+        }
+    }
 
-  protected mergeConfig(options?: Partial<LLMConfig>): LLMConfig {
-    return {
-      ...this.config,
-      ...options,
-    };
-  }
+    isInitialized(): boolean {
+        return this.initialized;
+    }
 }

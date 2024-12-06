@@ -27,6 +27,7 @@ export class WorkflowOrchestrator implements WorkflowExecutor {
   private readonly maxRetries: number;
   private readonly activeWorkflows: Map<string, Workflow>;
   private readonly pendingSteps: Map<string, Set<string>>;
+  private readonly logger: Logger;
 
   constructor(config: WorkflowOrchestratorConfig) {
     this.messageBroker = config.messageBroker;
@@ -34,6 +35,7 @@ export class WorkflowOrchestrator implements WorkflowExecutor {
     this.maxRetries = config.maxRetries || 3;
     this.activeWorkflows = new Map();
     this.pendingSteps = new Map();
+    this.logger = new Logger();
 
     this.setupMessageHandlers();
   }
@@ -89,8 +91,7 @@ export class WorkflowOrchestrator implements WorkflowExecutor {
       const readySteps = this.getReadySteps(workflow);
       await this.executeSteps(workflow, readySteps);
     } catch (error) {
-      Logger.error('Error starting workflow', {
-        error,
+      this.logger.error('Error starting workflow', error instanceof Error ? error : new Error(String(error)), {
         workflowId: workflow.config.id,
       });
       throw error;
@@ -137,16 +138,15 @@ export class WorkflowOrchestrator implements WorkflowExecutor {
           priority: 0,
         });
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        Logger.error('Error executing workflow step', {
-          error: errorMessage,
+        const errorObj = error instanceof Error ? error : new Error(String(error));
+        this.logger.error('Error executing workflow step', errorObj, {
           workflowId: config.id,
           stepId: step.id,
         });
 
         if (step.failureStrategy === 'FAIL_WORKFLOW') {
           metadata.status = 'FAILED';
-          metadata.error = errorMessage;
+          metadata.error = errorObj.message;
           await this.stateStore.updateWorkflowState(config.id, workflow);
           throw error;
         }

@@ -1,4 +1,27 @@
-import { Message, MessageSchema, MessageSerializer } from '../types';
+import { Message, MessageSchema } from '../types';
+
+/**
+ * Interface for message serialization
+ */
+export interface MessageSerializer {
+  /**
+   * Serialize a message to string format
+   * @param message The message to serialize
+   */
+  serialize(message: unknown): Promise<string>;
+
+  /**
+   * Deserialize a string back to message format
+   * @param data The string data to deserialize
+   */
+  deserialize(data: string): Promise<unknown>;
+
+  /**
+   * Validate a message format
+   * @param message The message to validate
+   */
+  validate(message: unknown): boolean;
+}
 
 export class DefaultMessageSerializer implements MessageSerializer {
   public async serialize(message: Message): Promise<string> {

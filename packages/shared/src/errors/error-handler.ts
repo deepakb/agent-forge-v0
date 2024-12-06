@@ -1,5 +1,6 @@
-import { Logger } from '../logging/logger';
-
+import { injectable, inject } from 'inversify';
+import { ILogger, IErrorHandler } from '../container/interfaces';
+import { SHARED_TYPES } from '../container/types';
 import { AgentForgeError } from './custom-errors';
 import { formatErrorForLogging, formatErrorForClient } from './error-formatter';
 
@@ -9,11 +10,14 @@ export interface ErrorHandlerConfig {
   shouldNotifyExternal?: boolean;
 }
 
-export class ErrorHandler {
-  private static instance: ErrorHandler;
+@injectable()
+export class ErrorHandler implements IErrorHandler {
   private config: Required<ErrorHandlerConfig>;
 
-  private constructor(config: ErrorHandlerConfig = {}) {
+  constructor(
+    @inject(SHARED_TYPES.Logger) private logger: ILogger,
+    config: ErrorHandlerConfig = {}
+  ) {
     this.config = {
       maxRetries: config.maxRetries ?? 3,
       retryDelay: config.retryDelay ?? 1000,
@@ -21,66 +25,111 @@ export class ErrorHandler {
     };
   }
 
-  public static getInstance(config?: ErrorHandlerConfig): ErrorHandler {
-    if (!ErrorHandler.instance) {
-      ErrorHandler.instance = new ErrorHandler(config);
+  public handleError(error: Error | string): void {
+    const errorObj = error instanceof Error ? error : new Error(error);
+    
+    if (errorObj instanceof AgentForgeError) {
+      this.handleAgentForgeError(errorObj);
+    } else {
+      this.handleGenericError(errorObj);
     }
-    return ErrorHandler.instance;
-  }
 
-  public async handleError(
-    error: Error | AgentForgeError,
-    context?: Record<string, unknown>
-  ): Promise<void> {
-    const formattedError = formatErrorForLogging(error);
-
-    // Log the error
-    await Logger.error(formattedError, context);
-
-    // Notify external monitoring if configured
     if (this.config.shouldNotifyExternal) {
-      await this.notifyExternalMonitoring(error, context);
+      this.notifyExternalMonitoring(errorObj);
     }
   }
 
-  public async withRetry<T>(
+  private handleAgentForgeError(error: AgentForgeError): void {
+    const metadata = {
+      code: error.code,
+      isOperational: error.isOperational,
+      isRetryable: error.isRetryable,
+      context: error.context,
+    };
+
+    this.logger.error(error.message, error, metadata);
+  }
+
+  private handleGenericError(error: Error): void {
+    this.logger.error(error.message, error);
+  }
+
+  public async wrap<T>(fn: () => Promise<T>, retryCount = 3): Promise<T> {
+    try {
+      return await this.withRetry(fn, retryCount);
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.handleError(err);
+      throw err;
+    }
+  }
+
+  private async withRetry<T>(
     operation: () => Promise<T>,
-    context?: Record<string, unknown>
+    maxRetries: number = 3,
+    currentRetry: number = 0
   ): Promise<T> {
-    let lastError: Error | undefined;
-
-    for (let attempt = 1; attempt <= this.config.maxRetries; attempt++) {
-      try {
-        return await operation();
-      } catch (error) {
-        lastError = error as Error;
-        await Logger.warn(`Retry attempt ${attempt}/${this.config.maxRetries} failed`, {
-          ...context,
-          error: formatErrorForClient(lastError),
+    try {
+      return await operation();
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      
+      if (currentRetry < maxRetries && this.isRetryableError(err)) {
+        const delay = Math.min(1000 * Math.pow(2, currentRetry), 10000); // Exponential backoff with max 10s
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        this.logger.warn(`Retrying operation (${currentRetry + 1}/${maxRetries})`, {
+          error: err.message,
+          retryCount: currentRetry + 1,
+          maxRetries,
         });
-
-        if (attempt < this.config.maxRetries) {
-          await this.delay(this.config.retryDelay * attempt);
-        }
+        
+        return this.withRetry(operation, maxRetries, currentRetry + 1);
       }
+      
+      throw err;
     }
-
-    throw lastError;
   }
 
-  private async notifyExternalMonitoring(
-    error: Error | AgentForgeError,
-    context?: Record<string, unknown>
-  ): Promise<void> {
-    // Implement external monitoring integration (e.g., Sentry, Datadog)
-    // This is a placeholder for future implementation
-    console.log('External monitoring notification:', {
-      error: formatErrorForClient(error),
-      context,
-    });
+  public isOperationalError(error: Error): boolean {
+    if (error instanceof AgentForgeError) {
+      return error.isOperational;
+    }
+    return false;
   }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  public isRetryableError(error: Error): boolean {
+    if (error instanceof AgentForgeError) {
+      return error.isRetryable;
+    }
+    return false;
+  }
+
+  public getErrorCode(error: Error): string | undefined {
+    if (error instanceof AgentForgeError) {
+      return error.code;
+    }
+    return undefined;
+  }
+
+  public getErrorContext(error: Error): Record<string, unknown> | undefined {
+    if (error instanceof AgentForgeError) {
+      return error.context;
+    }
+    return undefined;
+  }
+
+  private async notifyExternalMonitoring(error: Error, context?: Record<string, unknown>): Promise<void> {
+    // This is a placeholder for external error monitoring integration
+    // In a real implementation, this would send the error to a service like Sentry, DataDog, etc.
+    const errorData = {
+      message: error.message,
+      stack: error.stack,
+      context: context || {},
+      timestamp: new Date().toISOString(),
+    };
+
+    // Log that we're sending to external monitoring
+    this.logger.info('Sending error to external monitoring', errorData);
   }
 }

@@ -1,11 +1,12 @@
 'use client'
 
-import * as React from "react"
-import useEmblaCarousel from 'embla-carousel-react'
 import AutoPlay from 'embla-carousel-autoplay'
+import useEmblaCarousel from 'embla-carousel-react'
+import { ChevronLeft, ChevronRight } from "lucide-react"
+import * as React from "react"
+
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight } from "lucide-react"
 
 type Product = {
   title: string

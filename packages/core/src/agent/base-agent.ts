@@ -1,5 +1,6 @@
 import { EventEmitter } from 'eventemitter3';
 import { v4 as uuidv4 } from 'uuid';
+import { inject, injectable } from 'inversify';
 import {
   AgentConfig,
   AgentLifecycle,
@@ -11,22 +12,26 @@ import {
   TaskResult,
 } from '../types';
 import { Logger } from '@agent-forge/shared';
+import { TYPES } from '../container/types';
+import { ITaskManager } from '../types/task-manager.interface';
+import { IMessageManager } from '../types/message-manager.interface';
 
+@injectable()
 export abstract class BaseAgent implements AgentLifecycle {
   protected readonly id: string;
   protected config: AgentConfig;
   protected metadata: AgentMetadata;
-  protected events: EventEmitter;
   protected isRunning: boolean;
-  protected currentTasks: Map<string, Task>;
-  protected messageHandlers: Map<string, MessageHandler>;
 
-  constructor(config: Partial<AgentConfig> = {}) {
+  constructor(
+    @inject(TYPES.Logger) protected readonly logger: Logger,
+    @inject(TYPES.EventEmitter) protected readonly events: EventEmitter,
+    @inject(TYPES.TaskManager) protected readonly taskManager: ITaskManager,
+    @inject(TYPES.MessageManager) protected readonly messageManager: IMessageManager,
+    config: Partial<AgentConfig> = {}
+  ) {
     this.id = config.id || uuidv4();
-    this.events = new EventEmitter();
     this.isRunning = false;
-    this.currentTasks = new Map();
-    this.messageHandlers = new Map();
 
     this.config = {
       id: this.id,
@@ -82,7 +87,7 @@ export abstract class BaseAgent implements AgentLifecycle {
       throw new Error('Agent is not paused');
     }
 
-    this.metadata.status = this.currentTasks.size > 0 ? 'BUSY' : 'IDLE';
+    this.metadata.status = this.taskManager.getCurrentTasks().length > 0 ? 'BUSY' : 'IDLE';
     await this.onResume();
     await this.emitStateChange();
   }
@@ -117,17 +122,17 @@ export abstract class BaseAgent implements AgentLifecycle {
 
   protected async handleTask(task: Task): Promise<TaskResult> {
     try {
-      this.currentTasks.set(task.config.id, task);
+      await this.taskManager.addTask(task);
       this.metadata.currentTasks.push(task.config.id);
       this.metadata.status = 'BUSY';
       await this.emitStateChange();
 
       const result = await this.executeTask(task);
 
-      this.currentTasks.delete(task.config.id);
+      await this.taskManager.removeTask(task.config.id);
       this.metadata.currentTasks = this.metadata.currentTasks.filter(id => id !== task.config.id);
       this.metadata.completedTasks++;
-      this.metadata.status = this.currentTasks.size > 0 ? 'BUSY' : 'IDLE';
+      this.metadata.status = this.taskManager.getCurrentTasks().length > 0 ? 'BUSY' : 'IDLE';
       await this.emitStateChange();
 
       return result;
@@ -153,7 +158,7 @@ export abstract class BaseAgent implements AgentLifecycle {
     const interval = setInterval(() => {
       this.metadata.lastHeartbeat = new Date();
       this.emitStateChange().catch(error => {
-        Logger.error('Failed to emit heartbeat', { error, agentId: this.id });
+        this.logger.error('Failed to emit heartbeat', error, { agentId: this.id });
       });
     }, 30000); // Every 30 seconds
 

@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ../../
+      dockerfile: apps/examples/08-comprehensive-demo/Dockerfile
+    environment:
+      - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - ../../:/app
+      - /app/node_modules
+    depends_on:
+      - redis
+    ports:
+      - "3000:3000"
+    command: npm run dev -w @agent-forge/example-comprehensive-demo
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  redis-data:

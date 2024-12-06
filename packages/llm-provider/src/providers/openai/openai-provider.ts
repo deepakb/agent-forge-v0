@@ -1,94 +1,115 @@
+import { injectable, inject } from 'inversify';
 import OpenAI from 'openai';
-
-import { LLMConfig, LLMResponse } from '../../types/provider';
+import { ILogger, IErrorHandler } from '@agent-forge/shared';
+import { LLM_PROVIDER_TYPES } from '../../container/types';
+import { ILLMProvider, IOpenAIConfig } from '../../container/interfaces';
+import { Message, LLMResponse, StreamingOptions, ProviderConfig } from '../../types/provider';
 import { BaseLLMProvider } from '../base/base-provider';
+import { LLMConfigurationError } from '../../errors/provider-errors';
 
-export class OpenAIProvider extends BaseLLMProvider {
-  private client!: OpenAI;
+@injectable()
+export class OpenAIProvider extends BaseLLMProvider implements ILLMProvider {
+    private client: OpenAI | null = null;
+    protected config!: IOpenAIConfig;
 
-  initialize(config: LLMConfig): void {
-    this.config = config;
-    this.client = new OpenAI({
-      apiKey: config.apiKey,
-      organization: config.organizationId,
-    });
-  }
-
-  async chat(message: string): Promise<LLMResponse> {
-    const response = await this.client.chat.completions.create({
-      messages: [{ role: 'user', content: message }],
-      model: this.config.modelName || 'gpt-3.5-turbo',
-      temperature: this.config.temperature,
-      max_tokens: this.config.maxTokens,
-    });
-
-    return {
-      text: response.choices[0]?.message?.content || '',
-      usage: response.usage
-        ? {
-            promptTokens: response.usage.prompt_tokens,
-            completionTokens: response.usage.completion_tokens,
-            totalTokens: response.usage.total_tokens,
-          }
-        : undefined,
-    };
-  }
-
-  async complete(prompt: string, options?: Partial<LLMConfig>): Promise<LLMResponse> {
-    const config = this.mergeConfig(options);
-    const response = await this.client.completions.create({
-      prompt,
-      model: config.modelName || 'text-davinci-003',
-      temperature: config.temperature,
-      max_tokens: config.maxTokens,
-    });
-
-    return {
-      text: response.choices[0]?.text || '',
-      usage: response.usage
-        ? {
-            promptTokens: response.usage.prompt_tokens,
-            completionTokens: response.usage.completion_tokens,
-            totalTokens: response.usage.total_tokens,
-          }
-        : undefined,
-    };
-  }
-
-  async *stream(
-    prompt: string,
-    options?: Partial<LLMConfig>
-  ): AsyncGenerator<string, void, unknown> {
-    const config = this.mergeConfig(options);
-    const stream = await this.client.chat.completions.create({
-      messages: [{ role: 'user', content: prompt }],
-      model: config.modelName || 'gpt-3.5-turbo',
-      temperature: config.temperature,
-      max_tokens: config.maxTokens,
-      stream: true,
-    });
-
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
-      if (content) {
-        yield content;
-      }
+    constructor(
+        @inject(LLM_PROVIDER_TYPES.Logger) logger: ILogger,
+        @inject(LLM_PROVIDER_TYPES.ErrorHandler) errorHandler: IErrorHandler
+    ) {
+        super(logger, errorHandler);
     }
-  }
 
-  async embedText(text: string): Promise<number[]> {
-    const response = await this.client.embeddings.create({
-      model: 'text-embedding-ada-002',
-      input: text,
-    });
+    async initialize(config: ProviderConfig): Promise<void> {
+        if (!this.validateConfig(config)) {
+            throw new LLMConfigurationError('Invalid OpenAI configuration');
+        }
 
-    return response.data[0].embedding;
-  }
+        const openaiConfig = config as IOpenAIConfig;
+        this.client = new OpenAI({
+            apiKey: openaiConfig.openaiApiKey,
+            organization: openaiConfig.organizationId
+        });
+        this.config = openaiConfig;
+        this.initialized = true;
+    }
 
-  protected mergeConfig(options?: Partial<LLMConfig>): LLMConfig {
-    return {
-      ...this.config,
-      ...options,
-    };
-  }
+    validateConfig(config: ProviderConfig): boolean {
+        if (!config || config.provider !== 'openai') return false;
+        const openaiConfig = config as IOpenAIConfig;
+        return !!openaiConfig.openaiApiKey;
+    }
+
+    async complete(messages: Message[], options?: StreamingOptions): Promise<LLMResponse> {
+        this.ensureInitialized();
+        
+        try {
+            const response = await this.client!.chat.completions.create({
+                model: this.config.modelName,
+                messages: messages.map(msg => ({
+                    role: msg.role,
+                    content: msg.content
+                })),
+                max_tokens: options?.maxTokens,
+                temperature: options?.temperature,
+                top_p: options?.topP,
+                frequency_penalty: options?.frequencyPenalty,
+                presence_penalty: options?.presencePenalty,
+                stop: options?.stopSequences
+            });
+
+            return {
+                content: response.choices[0].message.content || '',
+                model: response.model,
+                finishReason: response.choices[0].finish_reason,
+                usage: {
+                    promptTokens: response.usage?.prompt_tokens,
+                    completionTokens: response.usage?.completion_tokens,
+                    totalTokens: response.usage?.total_tokens
+                },
+                metadata: {
+                    model: response.model,
+                    provider: 'openai',
+                    stopReason: response.choices[0].finish_reason || null
+                }
+            };
+        } catch (error) {
+            this.handleError('Error completing messages with OpenAI', error);
+            throw error;
+        }
+    }
+
+    async *stream(messages: Message[], options?: StreamingOptions): AsyncGenerator<string, void, unknown> {
+        this.ensureInitialized();
+
+        try {
+            const stream = await this.client!.chat.completions.create({
+                model: this.config.modelName,
+                messages: messages.map(msg => ({
+                    role: msg.role,
+                    content: msg.content
+                })),
+                max_tokens: options?.maxTokens,
+                temperature: options?.temperature,
+                top_p: options?.topP,
+                frequency_penalty: options?.frequencyPenalty,
+                presence_penalty: options?.presencePenalty,
+                stop: options?.stopSequences,
+                stream: true
+            });
+
+            for await (const chunk of stream) {
+                const content = chunk.choices[0]?.delta?.content;
+                if (content) {
+                    yield content;
+                }
+            }
+        } catch (error) {
+            this.handleError('Error streaming messages with OpenAI', error);
+            throw error;
+        }
+    }
+
+    getProviderName(): string {
+        return 'openai';
+    }
 }

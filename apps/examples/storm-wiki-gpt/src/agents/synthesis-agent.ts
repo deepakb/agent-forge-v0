@@ -1,7 +1,7 @@
 import { BaseAgent } from './base-agent';
 import { AgentMessage, MessageType, SearchResult, SynthesisAgentConfig, TaskResult } from '../types';
 import { OpenAIHelper } from '../utils/openai-helper';
-import { Logger } from '@agent-forge/shared';
+import { LoggerService } from '../utils/logger';
 import { EventEmitter } from 'events';
 
 export class SynthesisAgent extends BaseAgent {
@@ -149,19 +149,19 @@ Write the article now, ensuring EVERY fact has a citation and all sources are pr
   public onSynthesisComplete(callback: (result: { content: string; sources: string[] }) => void): void {
     try {
       this.completionEmitter.on('synthesisComplete', callback);
-      Logger.info('SynthesisAgent registered completion callback');
+      this.logger.info('SynthesisAgent registered completion callback');
     } catch (error) {
-      Logger.error('Error registering synthesis completion callback', { error });
+      this.logger.error('Error registering synthesis completion callback', error instanceof Error ? error : new Error('Unknown error'));
       throw error;
     }
   }
 
   public initialize(): void {
-    Logger.info('SynthesisAgent initialized successfully', { agentId: this.getId() });
+    this.logger.info('SynthesisAgent initialized successfully', { agentId: this.getId() });
   }
 
   public cleanup(): void {
     this.completionEmitter.removeAllListeners();
-    Logger.info('SynthesisAgent cleaned up successfully', { agentId: this.getId() });
+    this.logger.info('SynthesisAgent cleaned up successfully', { agentId: this.getId() });
   }
 }

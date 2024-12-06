@@ -1,14 +1,14 @@
 'use client'
 
-import { Header } from '@/components/sections/header'
-import { HeroSection } from '@/components/sections/hero'
-import { FeaturesSection } from '@/components/sections/features'
 import { ApplicationsSection } from '@/components/sections/applications'
-import { IntegrationsSection } from '@/components/sections/integrations'
 import { CaseStudiesSection } from '@/components/sections/case-studies'
 import { CTASection } from '@/components/sections/cta'
-import { ResourcesSection } from '@/components/sections/resources'
+import { FeaturesSection } from '@/components/sections/features'
 import { Footer } from '@/components/sections/footer'
+import { Header } from '@/components/sections/header'
+import { HeroSection } from '@/components/sections/hero'
+import { IntegrationsSection } from '@/components/sections/integrations'
+import { ResourcesSection } from '@/components/sections/resources'
 
 export default function Home() {
   return (
