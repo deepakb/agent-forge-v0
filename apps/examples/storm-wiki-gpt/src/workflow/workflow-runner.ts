@@ -19,8 +19,16 @@ import {
   TaskResult,
 } from '../types';
 
-interface WorkflowError extends Error {
-  workflowId?: string;
+class WorkflowError extends Error {
+  readonly context: { workflowId: string };
+
+  constructor(message: string, context: { workflowId: string }) {
+    super(message);
+    this.name = 'WorkflowError';
+    this.context = context;
+    // Ensure proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, WorkflowError.prototype);
+  }
 }
 
 export class WorkflowRunner {
@@ -129,9 +137,13 @@ export class WorkflowRunner {
 
     // Start the workflow with the topic
     this.startWorkflow(topic).catch((error) => {
-      const workflowError = error as WorkflowError;
-      workflowError.workflowId = this.workflowId;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const workflowError = new WorkflowError(errorMessage, {
+        workflowId: this.workflowId
+      });
+      
       this.logger.error('Workflow failed', workflowError);
+      throw workflowError;
     });
   }
 
@@ -144,43 +156,50 @@ export class WorkflowRunner {
 
       // Create initial task
       const task: Task = {
-        id: uuidv4(),
-        type: 'PROCESS_TOPIC',
-        data: {
-          agentId: this.queryAgentId,
-          message: {
-            type: MessageType.TOPIC,
-            source: 'workflow',
-            target: this.queryAgentId,
-            data: topic,
-            timestamp: new Date().toISOString()
-          }
-        },
         config: {
           id: uuidv4(),
           type: 'PROCESS_TOPIC',
           retryAttempts: 3,
           priority: 'MEDIUM',
           dependencies: [],
-          requiredCapabilities: [],
-          timeout: 30000,
-          secure: true
+          requiredCapabilities: []
+        },
+        metadata: {
+          status: 'PENDING',
+          createdAt: new Date(),
+          attempts: 0,
+          progress: 0
+        },
+        result: {
+          success: false,
+          data: {
+            agentId: this.queryAgentId,
+            message: {
+              type: MessageType.TOPIC,
+              source: this.workflowId,
+              target: this.queryAgentId,
+              data: topic
+            }
+          },
+          error: undefined
         }
       };
 
       const result = await this.submitTask(task);
       await this.handleTaskResult(result);
     } catch (error) {
-      const workflowError = error as WorkflowError;
-      workflowError.workflowId = this.workflowId;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const workflowError = new WorkflowError(errorMessage, {
+        workflowId: this.workflowId
+      });
       this.logger.error('Workflow failed', workflowError);
-      throw error;
+      throw workflowError;
     }
   }
 
   private async submitTask(task: Task): Promise<TaskResult> {
     try {
-      const taskData = task.data as { agentId: string; message: AgentMessage };
+      const taskData = task.result?.data as { agentId: string; message: AgentMessage };
       const agent = this.getAgent(taskData.agentId);
       if (!agent) {
         throw new Error(`Unknown agent: ${taskData.agentId}`);
@@ -188,10 +207,13 @@ export class WorkflowRunner {
 
       return await agent.handleMessage(taskData.message);
     } catch (error) {
-      const workflowError = error as WorkflowError;
-      workflowError.workflowId = this.workflowId;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const workflowError = new WorkflowError(errorMessage, {
+        workflowId: this.workflowId,
+        // taskId: task.config.id
+      });
       this.logger.error('Task submission failed', workflowError);
-      throw error;
+      throw workflowError;
     }
   }
 
@@ -204,18 +226,20 @@ export class WorkflowRunner {
 
   private async handleTaskResult(result: TaskResult): Promise<void> {
     try {
-      if (!result.message) {
-        throw new Error('Task result missing message');
+      const message = result.data as AgentMessage;
+      if (!message) {
+        throw new Error('Task result missing message data');
       }
-
-      const message = result.message;
       
-      this.logger.info('Handling task result', {
-        workflowId: this.workflowId,
-        messageType: message.type,
-        source: message.source,
-        target: message.target,
-      });
+      const logDetails = {
+        context: {
+          workflowId: this.workflowId,
+          messageType: message.type,
+          source: message.source,
+          target: message.target
+        }
+      };
+      this.logger.info('Handling task result', logDetails);
 
       if (message.type === MessageType.ARTICLE) {
         // Workflow complete
@@ -261,16 +285,12 @@ export class WorkflowRunner {
 
       await this.handleTaskResult(targetResult);
     } catch (error) {
-      const workflowError = error as WorkflowError;
-      workflowError.workflowId = this.workflowId;
-      this.logger.error('Error in task result handler', workflowError);
-      await this.security.logError(error as Error, {
-        agentId: 'workflow-runner',
-        operation: 'HANDLE_TASK_RESULT',
-        timestamp: new Date(),
-        metadata: { workflowId: this.workflowId }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const workflowError = new WorkflowError(errorMessage, {
+        workflowId: this.workflowId
       });
-      throw error;
+      this.logger.error('Error in task result handler', workflowError);
+      throw workflowError;
     }
   }
 

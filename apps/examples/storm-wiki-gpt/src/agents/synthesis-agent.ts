@@ -135,13 +135,14 @@ Write the article now, ensuring EVERY fact has a citation and all sources are pr
 
       return {
         success: true,
-        message: nextMessage,
+        data: nextMessage
       };
     } catch (error) {
       this.logger.error('Synthesis agent failed', error instanceof Error ? error : new Error('Unknown error'));
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        data: null,
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }

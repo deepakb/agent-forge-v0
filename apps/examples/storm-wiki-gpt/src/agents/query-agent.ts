@@ -107,14 +107,15 @@ Example response format:
 
       return {
         success: true,
-        message: nextMessage,
+        data: nextMessage
       };
     } catch (error) {
       const errorObj = error instanceof Error ? error : new Error('Unknown error');
       this.logger.error('Query agent failed', errorObj);
       return {
         success: false,
-        error: errorObj.message,
+        data: null,
+        error: errorObj.message
       };
     }
   }

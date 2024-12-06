@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Task, TaskConfig, TaskMetadata, TaskResult } from '@agent-forge/core';
 
 export enum MessageType {
   TOPIC = 'TOPIC',
@@ -47,42 +48,8 @@ export const FetchAgentConfigSchema = BaseAgentConfigSchema.extend({
 
 export const SynthesisAgentConfigSchema = BaseAgentConfigSchema;
 
-// Task Types
-export interface Task {
-  id: string;
-  type: string;
-  data: unknown;
-  config: TaskConfig;
-  metadata?: TaskMetadata;
-  secure?: boolean;
-}
-
-export interface TaskResult {
-  success: boolean;
-  error?: string;
-  data?: unknown;
-  message?: AgentMessage;
-}
-
-export interface TaskConfig {
-  id: string;
-  type: string;
-  retryAttempts: number;
-  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  dependencies: string[];
-  requiredCapabilities: string[];
-  timeout?: number;
-  secure?: boolean;
-}
-
-export interface TaskMetadata {
-  startTime?: string;
-  endTime?: string;
-  duration?: number;
-  status?: string;
-  error?: string;
-  retryCount?: number;
-}
+// Re-export core package types
+export { Task, TaskConfig, TaskMetadata, TaskResult };
 
 // Agent Types
 export interface SearchResult {
@@ -101,11 +68,11 @@ export interface AgentMessage {
 
 export interface SecurityConfig {
   encryption?: {
-    messages?: boolean;       // Enable/disable message encryption
-    state?: boolean;         // Enable/disable state encryption
+    messages?: boolean;
+    state?: boolean;
   };
   audit?: {
-    enabled?: boolean;       // Enable/disable audit logging
+    enabled?: boolean;
     level?: 'basic' | 'detailed';
   };
 }

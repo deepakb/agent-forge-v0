@@ -58,13 +58,14 @@ export class FetchAgent extends BaseAgent {
 
       return {
         success: true,
-        message: nextMessage,
+        data: nextMessage
       };
     } catch (error) {
       this.logger.error('Fetch agent failed', error instanceof Error ? error : new Error('Unknown error'));
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        data: null,
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
