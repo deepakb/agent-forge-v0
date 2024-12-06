@@ -34,7 +34,7 @@
     "@agent-forge/shared": "workspace:*",
     "eventemitter3": "^5.0.1",
     "inversify": "^6.0.1",
-    "reflect-metadata": "^0.1.13",
+    "reflect-metadata": "^0.2.2",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",
     "zod": "^3.23.8"
