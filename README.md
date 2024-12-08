@@ -36,35 +36,82 @@ Agent Forge is a powerful, enterprise-grade framework for building, managing, an
 
 ## 📦 Packages
 
-### @agent-forge/core
-The core package provides fundamental agent functionality:
+### @agent-forge/core (v0.1.0)
+Core functionality for Agent Forge:
 - Base agent implementation
 - Task execution framework
 - Workflow management
 - State management interfaces
 - Communication protocols
+- TypeScript support with dual CJS/ESM exports
 
-### @agent-forge/llm-provider
-Integration with Language Learning Models:
-- OpenAI integration
-- Extensible provider interface
-- AI capability management
+### @agent-forge/llm-provider (v0.1.0)
+Comprehensive LLM integration package supporting multiple providers:
+- Multiple LLM Provider Support:
+  - OpenAI (GPT-3.5, GPT-4)
+  - Anthropic (Claude-2)
+  - Fal.ai Integration
+- Provider-specific optimizations
+- Streaming support
+- Rate limiting and token management
+- Error handling and retries
+- TypeScript-first with dual CJS/ESM support
 
-### @agent-forge/shared
-Common utilities and shared functionality:
-- Logging (Winston-based)
-- Encryption utilities
+### @agent-forge/shared (v0.1.0)
+Shared utilities and common functionality:
 - Common types and interfaces
+- Utility functions
 - Shared constants
+- Cross-package helpers
+- TypeScript-first design
 
-## 🚀 Getting Started
+## 🚀 Installation
 
-1. Install the required packages:
 ```bash
-npm install @agent-forge/core @agent-forge/llm-provider @agent-forge/shared
+# Install core package
+npm install @agent-forge/core
+
+# Install LLM provider
+npm install @agent-forge/llm-provider
+
+# Install shared utilities
+npm install @agent-forge/shared
 ```
 
-2. Create a basic agent:
+## 💻 Development
+
+All packages in Agent Forge follow a consistent development workflow:
+
+```bash
+# Install dependencies
+npm install
+
+# Build the package
+npm run build
+
+# Development with watch mode
+npm run dev
+
+# Run tests
+npm run test
+
+# Run linting
+npm run lint
+
+# Format code
+npm run format
+```
+
+Each package supports:
+- TypeScript with proper type definitions
+- Dual CJS/ESM module support
+- Jest for testing
+- ESLint for code quality
+- Prettier for code formatting
+
+## 🛠️ Getting Started
+
+1. Create a basic agent:
 ```typescript
 import { BaseAgent } from '@agent-forge/core';
 
@@ -75,28 +122,6 @@ class MyAgent extends BaseAgent {
   
   // Implement other required abstract methods
 }
-```
-
-## 🛠️ Development
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/agent-forge.git
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Build all packages:
-```bash
-npm run build
-```
-
-4. Run tests:
-```bash
-npm test
 ```
 
 ## 📝 Requirements
