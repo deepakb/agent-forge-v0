@@ -19,7 +19,7 @@ export interface StreamingOptions {
 }
 
 export interface BaseProviderConfig {
-    provider: 'openai' | 'anthropic';
+    provider: 'openai' | 'anthropic' | 'fal-ai';
     modelName: string;
     maxTokens?: number;
     temperature?: number;
@@ -50,9 +50,9 @@ export interface LLMResponse {
     };
 }
 
-export type ProviderType = 'openai' | 'anthropic';
+export type ProviderType = 'openai' | 'anthropic' | 'fal-ai';
 
-export const SUPPORTED_PROVIDERS: ProviderType[] = ['openai', 'anthropic'];
+export const SUPPORTED_PROVIDERS: ProviderType[] = ['openai', 'anthropic', 'fal-ai'];
 
 export interface LLMProvider {
   initialize(config: ProviderConfig): Promise<void>;
